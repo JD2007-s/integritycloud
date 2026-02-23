@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 from functools import wraps
 
 import sqlite3
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 from flask_login import (
     LoginManager, UserMixin,
