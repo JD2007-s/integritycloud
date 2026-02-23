@@ -6,6 +6,14 @@
   <h2 class="text-xl font-bold mb-2">Compare Two Files</h2>
   <p class="text-sm text-gray-400 mb-4">Checks if both files are identical using SHA-256.</p>
 
+{% if current_user.is_admin %}
+  <div class="mt-4 mb-4 bg-amber-900/30 border border-amber-700 rounded p-3 text-sm text-amber-200">
+    Admin Mode enabled. Open 
+    <a href="/admin" class="underline hover:text-amber-100">Admin Panel</a> 
+    to view system-wide stats.
+  </div>
+{% endif %}
+
   <form id="compareForm" enctype="multipart/form-data">
     <label class="text-sm text-gray-300">File 1</label>
     <input type="file" name="file1" required class="mb-4 block w-full text-sm text-gray-300">
