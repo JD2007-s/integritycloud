@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Home - IntegrityCloud{% endblock %}
+
+{% block content %}
+<div class="grid md:grid-cols-2 gap-6">
+
+  <!-- REGISTER / STORE -->
+  <div class="bg-zinc-900 p-6 rounded-xl">
+    <h2 class="text-xl font-bold mb-2">Register File Hash</h2>
+    <p class="text-sm text-gray-400 mb-4">Store the file fingerprint in cloud DB.</p>
+
+    <form id="registerForm" enctype="multipart/form-data">
+      <input id="registerFile" type="file" name="file" required class="mb-4 block w-full text-sm text-gray-300">
+      <button class="bg-white text-black w-full py-2 rounded font-semibold hover:bg-gray-200" type="submit">
+        Store Hash
+      </button>
+    </form>
+
+    <div id="registerOut" class="mt-4 text-sm hidden"></div>
+  </div>
+
+  <!-- VERIFY -->
+  <div class="bg-zinc-900 p-6 rounded-xl">
+    <h2 class="text-xl font-bold mb-2">Verify Integrity</h2>
+    <p class="text-sm text-gray-400 mb-4">Upload again to check SAFE / TAMPERED.</p>
+
+    <form id="verifyForm" enctype="multipart/form-data">
+      <input id="verifyFile" type="file" name="file" required class="mb-4 block w-full text-sm text-gray-300">
+      <button class="bg-white text-black w-full py-2 rounded font-semibold hover:bg-gray-200" type="submit">
+        Verify File
+      </button>
+    </form>
+
+    <div id="verifyOut" class="mt-4 text-sm hidden"></div>
+  </div>
+
+</div>
+
+<script>
+  async function postFile(url, fileInputId) {
+    const inp = document.getElementById(fileInputId);
+    if (!inp.files.length) throw new Error("Choose a file first");
+    const fd = new FormData();
+    fd.append("file", inp.files[0]);
+    const res = await fetch(url, { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Request failed");
+    return data;
+  }
+
+  // Register
+  document.getElementById("registerForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const out = document.getElementById("registerOut");
+    out.className = "mt-4 text-sm";
+    out.classList.remove("hidden");
+    out.textContent = "Processing...";
+    try {
+      const data = await postFile("/api/register", "registerFile");
+      out.classList.add("text-green-400");
+      out.innerHTML = `
+        ✅ Stored<br>
+        <span class="text-gray-300">File:</span> ${data.filename}<br>
+        <span class="text-gray-300">Size:</span> ${data.filesize} bytes<br>
+        <span class="text-gray-300">Hash:</span> <span class="break-all">${data.hash}</span>
+      `;
+    } catch (err) {
+      out.classList.add("text-red-400");
+      out.textContent = "❌ " + err.message;
+    }
+  });
+
+  // Verify
+  document.getElementById("verifyForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const out = document.getElementById("verifyOut");
+    out.className = "mt-4 text-sm";
+    out.classList.remove("hidden");
+    out.textContent = "Processing...";
+    try {
+      const data = await postFile("/api/verify", "verifyFile");
+
+      if (data.status === "SAFE") {
+        out.classList.add("text-green-400");
+        out.innerHTML = `🟢 SAFE: ${data.message}<br>
+          <span class="text-gray-300">File:</span> ${data.filename}<br>
+          <span class="text-gray-300">Expected:</span> <span class="break-all">${data.expected_hash}</span><br>
+          <span class="text-gray-300">Actual:</span> <span class="break-all">${data.actual_hash}</span>`;
+      } else if (data.status === "TAMPERED") {
+        out.classList.add("text-red-400");
+        out.innerHTML = `🔴 TAMPERED: ${data.message}<br>
+          <span class="text-gray-300">File:</span> ${data.filename}<br>
+          <span class="text-gray-300">Expected:</span> <span class="break-all">${data.expected_hash}</span><br>
+          <span class="text-gray-300">Actual:</span> <span class="break-all">${data.actual_hash}</span>`;
+      } else {
+        out.classList.add("text-yellow-400");
+        out.textContent = "🟡 " + data.message;
+      }
+    } catch (err) {
+      out.classList.add("text-red-400");
+      out.textContent = "❌ " + err.message;
+    }
+  });
+</script>
+{% endblock %}

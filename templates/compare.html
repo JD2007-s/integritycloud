@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Compare - IntegrityCloud{% endblock %}
+
+{% block content %}
+<div class="bg-zinc-900 p-6 rounded-xl max-w-xl mx-auto">
+  <h2 class="text-xl font-bold mb-2">Compare Two Files</h2>
+  <p class="text-sm text-gray-400 mb-4">Checks if both files are identical using SHA-256.</p>
+
+  <form id="compareForm" enctype="multipart/form-data">
+    <label class="text-sm text-gray-300">File 1</label>
+    <input type="file" name="file1" required class="mb-4 block w-full text-sm text-gray-300">
+
+    <label class="text-sm text-gray-300">File 2</label>
+    <input type="file" name="file2" required class="mb-4 block w-full text-sm text-gray-300">
+
+    <button class="bg-white text-black w-full py-2 rounded font-semibold hover:bg-gray-200" type="submit">
+      Compare
+    </button>
+  </form>
+
+  <div id="compareOut" class="mt-5 text-sm hidden"></div>
+</div>
+
+<script>
+  document.getElementById("compareForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const out = document.getElementById("compareOut");
+    out.className = "mt-5 text-sm";
+    out.classList.remove("hidden");
+    out.textContent = "Comparing...";
+
+    try {
+      const fd = new FormData(e.target);
+      const res = await fetch("/api/compare", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Compare failed");
+
+      if (data.result === "MATCH") {
+        out.classList.add("text-green-400");
+        out.innerHTML = `🟢 MATCH: Files are identical.<br><br>
+          <span class="text-gray-300">File1:</span> ${data.file1.name} (${data.file1.size} bytes)<br>
+          <span class="text-gray-300">Hash1:</span> <span class="break-all">${data.file1.hash}</span><br><br>
+          <span class="text-gray-300">File2:</span> ${data.file2.name} (${data.file2.size} bytes)<br>
+          <span class="text-gray-300">Hash2:</span> <span class="break-all">${data.file2.hash}</span>`;
+      } else {
+        out.classList.add("text-red-400");
+        out.innerHTML = `🔴 MISMATCH: Files are different.<br><br>
+          <span class="text-gray-300">File1:</span> ${data.file1.name} (${data.file1.size} bytes)<br>
+          <span class="text-gray-300">Hash1:</span> <span class="break-all">${data.file1.hash}</span><br><br>
+          <span class="text-gray-300">File2:</span> ${data.file2.name} (${data.file2.size} bytes)<br>
+          <span class="text-gray-300">Hash2:</span> <span class="break-all">${data.file2.hash}</span>`;
+      }
+    } catch (err) {
+      out.classList.add("text-red-400");
+      out.textContent = "❌ " + err.message;
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}IntegrityCloud{% endblock %}</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+
+  {% block head_extra %}{% endblock %}
+</head>
+
+<body class="bg-black text-white min-h-screen flex flex-col">
+
+  <!-- Snow background for ALL pages -->
+  <div class="fixed-bg">
+    <canvas></canvas>
+  </div>
+
+  <!--  Hidden text mask image required by script.js -->
+  
+
+  <header class="border-b border-zinc-800">
+    <div class="container mx-auto flex items-center justify-between p-6">
+      <div class="flex items-center gap-4">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-8 w-8 text-white" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 2l3 6 6 .5-4.5 3 1.5 6L12 15l-6 3 1.5-6L3 8.5 9 8 12 2z"></path>
+        </svg>
+        <h1 class="text-xl font-semibold">IntegrityCloud</h1>
+      </div>
+
+      <nav class="space-x-4 text-gray-300">
+        <a href="/home" class="hover:text-white">Home</a>
+        <a href="/compare" class="hover:text-white">Compare</a>
+        <a href="/logout" class="text-red-400 hover:text-red-300">Logout</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="flex-1 container mx-auto p-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-zinc-800">
+    <div class="container mx-auto p-6 text-sm text-gray-400">© 2026 IntegrityCloud</div>
+  </footer>
+
+  {% block body_end %}{% endblock %}
+
+  <!-- ✅ GSAP must load BEFORE script.js -->
+  <script src="https://unpkg.com/gsap@3/dist/gsap.min.js"></script>
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+</body>
+</html>

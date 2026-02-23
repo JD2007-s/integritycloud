@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Login - IntegrityCloud{% endblock %}
+
+{% block content %}
+<div class="flex justify-center items-center h-[60vh]">
+  <form method="POST" class="bg-zinc-900 p-8 rounded-xl w-80">
+    <h2 class="text-xl font-bold mb-4 text-center">Login</h2>
+    <input name="username" placeholder="Username" class="w-full mb-3 p-2 text-black rounded">
+    <input name="password" type="password" placeholder="Password" class="w-full mb-4 p-2 text-black rounded">
+    <button class="w-full bg-white text-black py-2 rounded">Login</button>
+  </form>
+</div>
+{% endblock %}
