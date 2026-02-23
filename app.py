@@ -576,5 +576,6 @@ def api_compare():
     })
 
 
+print("Register API hit")
 if __name__ == "__main__":
     app.run(debug=True)
