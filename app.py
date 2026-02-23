@@ -1,61 +1,84 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
 import hashlib
-import sqlite3
-from datetime import datetime
-from google.cloud import firestore
-db = firestore.Client()
+import os
+from datetime import datetime, timezone
+
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 
-DB_PATH = "integritycloud.db"
 
-# Dummy login credentials
+# Dummy login credentials (same as your code)
 USERNAME = "admin"
 PASSWORD = "admin123"
 
 
-# -------------------- DB --------------------
+# -------------------- DB (PostgreSQL on Render) --------------------
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """
+    Connect to Render PostgreSQL using DATABASE_URL env var.
+    sslmode=require is commonly needed for external Postgres URLs.
+    """
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("DATABASE_URL environment variable is not set.")
+
+    return psycopg2.connect(db_url, sslmode="require", cursor_factory=RealDictCursor)
+
 
 def init_db():
     conn = get_db()
     cur = conn.cursor()
 
+    # file_hashes table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS file_hashes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user TEXT NOT NULL,
+        id SERIAL PRIMARY KEY,
+        username TEXT NOT NULL,
         filename TEXT NOT NULL,
         filesize INTEGER NOT NULL,
         sha256 TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TIMESTAMP NOT NULL
     )
     """)
 
+    # tamper_logs table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS tamper_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user TEXT NOT NULL,
+        id SERIAL PRIMARY KEY,
+        username TEXT NOT NULL,
         filename TEXT NOT NULL,
         expected_sha256 TEXT NOT NULL,
         actual_sha256 TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TIMESTAMP NOT NULL
     )
     """)
 
     conn.commit()
+    cur.close()
     conn.close()
 
-init_db()
+
+# Initialize DB tables at startup
+# (Render will run this when service boots)
+try:
+    init_db()
+except Exception as e:
+    # Don't crash local dev if DATABASE_URL isn't set.
+    # On Render, DATABASE_URL will be set.
+    print("DB init warning:", str(e))
 
 
 # -------------------- HASH --------------------
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 # -------------------- AUTH --------------------
@@ -66,6 +89,7 @@ def login():
             session["user"] = USERNAME
             return redirect("/home")
     return render_template("login.html")
+
 
 @app.route("/logout")
 def logout():
@@ -79,6 +103,7 @@ def home():
     if "user" not in session:
         return redirect("/")
     return render_template("index.html")
+
 
 @app.route("/compare")
 def compare_page():
@@ -104,15 +129,18 @@ def api_register():
     file_hash = sha256_bytes(data)
     filesize = len(data)
     filename = f.filename or "unknown"
-    now = datetime.utcnow().isoformat()
+    now = utc_now()
 
     conn = get_db()
     cur = conn.cursor()
+
     cur.execute("""
-      INSERT INTO file_hashes (user, filename, filesize, sha256, created_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO file_hashes (username, filename, filesize, sha256, created_at)
+      VALUES (%s, %s, %s, %s, %s)
     """, (session["user"], filename, filesize, file_hash, now))
+
     conn.commit()
+    cur.close()
     conn.close()
 
     return jsonify({
@@ -120,7 +148,7 @@ def api_register():
         "filename": filename,
         "filesize": filesize,
         "hash": file_hash,
-        "created_at": now
+        "created_at": now.isoformat()
     })
 
 
@@ -149,13 +177,15 @@ def api_verify():
     cur.execute("""
       SELECT sha256, created_at
       FROM file_hashes
-      WHERE user = ? AND filename = ?
+      WHERE username = %s AND filename = %s
       ORDER BY id DESC
       LIMIT 1
     """, (session["user"], filename))
+
     row = cur.fetchone()
 
     if not row:
+        cur.close()
         conn.close()
         return jsonify({
             "status": "NOT_REGISTERED",
@@ -169,24 +199,27 @@ def api_verify():
     stored_time = row["created_at"]
 
     if expected_hash == actual_hash:
+        cur.close()
         conn.close()
         return jsonify({
             "status": "SAFE",
             "message": "File integrity verified. No changes detected.",
             "filename": filename,
             "filesize": filesize,
-            "stored_at": stored_time,
+            "stored_at": stored_time.isoformat() if stored_time else None,
             "expected_hash": expected_hash,
             "actual_hash": actual_hash
         })
 
     # Tampered → log it
-    now = datetime.utcnow().isoformat()
+    now = utc_now()
     cur.execute("""
-      INSERT INTO tamper_logs (user, filename, expected_sha256, actual_sha256, created_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO tamper_logs (username, filename, expected_sha256, actual_sha256, created_at)
+      VALUES (%s, %s, %s, %s, %s)
     """, (session["user"], filename, expected_hash, actual_hash, now))
+
     conn.commit()
+    cur.close()
     conn.close()
 
     return jsonify({
@@ -194,10 +227,10 @@ def api_verify():
         "message": "ALERT: File has been modified (hash mismatch).",
         "filename": filename,
         "filesize": filesize,
-        "stored_at": stored_time,
+        "stored_at": stored_time.isoformat() if stored_time else None,
         "expected_hash": expected_hash,
         "actual_hash": actual_hash,
-        "logged_at": now
+        "logged_at": now.isoformat()
     })
 
 
@@ -232,4 +265,5 @@ def api_compare():
 
 
 if __name__ == "__main__":
+    # Local dev only; Render uses gunicorn
     app.run(debug=True)
