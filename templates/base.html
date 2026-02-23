@@ -19,9 +19,6 @@
     <canvas></canvas>
   </div>
 
-  <!--  Hidden text mask image required by script.js -->
-  
-
   <header class="border-b border-zinc-800">
     <div class="container mx-auto flex items-center justify-between p-6">
       <div class="flex items-center gap-4">
@@ -32,9 +29,20 @@
       </div>
 
       <nav class="space-x-4 text-gray-300">
-        <a href="/home" class="hover:text-white">Home</a>
-        <a href="/compare" class="hover:text-white">Compare</a>
-        <a href="/logout" class="text-red-400 hover:text-red-300">Logout</a>
+        {% if current_user.is_authenticated %}
+          <a href="/dashboard" class="hover:text-white">Dashboard</a>
+          <a href="/home" class="hover:text-white">Home</a>
+          <a href="/compare" class="hover:text-white">Compare</a>
+          <span class="text-zinc-500">|</span>
+          <span class="text-zinc-300">Hi, {{ current_user.username }}</span>
+          <a href="/logout" class="text-red-400 hover:text-red-300">Logout</a>
+        {% else %}
+          <a href="/" class="hover:text-white">Login</a>
+          <a href="/signup" class="hover:text-white">Sign up</a>
+        {% endif %}
+        {% if current_user.is_admin %}
+          <a href="/admin" class="hover:text-white text-amber-300">Admin</a>
+        {% endif %}
       </nav>
     </div>
   </header>

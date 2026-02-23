@@ -2,10 +2,33 @@
 {% block title %}Home - IntegrityCloud{% endblock %}
 
 {% block content %}
+
+<!-- Top bar -->
+<div class="flex items-start justify-between flex-wrap gap-4 mb-6">
+  <div>
+    <h2 class="text-2xl font-bold">Home</h2>
+    <p class="text-sm text-zinc-400">
+      Register file hashes and verify integrity (SAFE / TAMPERED).
+    </p>
+    <p class="text-xs text-zinc-500 mt-1">
+      Logged in as: <span class="text-zinc-300">{{ current_user.username }}</span>
+    </p>
+  </div>
+
+  <div class="flex gap-3">
+    <a href="/dashboard" class="px-4 py-2 rounded bg-white text-black font-semibold hover:bg-zinc-200">
+      Dashboard
+    </a>
+    <a href="/compare" class="px-4 py-2 rounded border border-zinc-700 hover:border-zinc-500">
+      Compare Files
+    </a>
+  </div>
+</div>
+
 <div class="grid md:grid-cols-2 gap-6">
 
   <!-- REGISTER / STORE -->
-  <div class="bg-zinc-900 p-6 rounded-xl">
+  <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
     <h2 class="text-xl font-bold mb-2">Register File Hash</h2>
     <p class="text-sm text-gray-400 mb-4">Store the file fingerprint in cloud DB.</p>
 
@@ -20,7 +43,7 @@
   </div>
 
   <!-- VERIFY -->
-  <div class="bg-zinc-900 p-6 rounded-xl">
+  <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
     <h2 class="text-xl font-bold mb-2">Verify Integrity</h2>
     <p class="text-sm text-gray-400 mb-4">Upload again to check SAFE / TAMPERED.</p>
 

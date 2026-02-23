@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - IntegrityCloud{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex items-start justify-between flex-wrap gap-4">
+    <div>
+      <h2 class="text-2xl font-bold">Dashboard</h2>
+      <p class="text-zinc-400 text-sm">Your recent integrity activity and logs</p>
+    </div>
+    <div class="flex gap-3">
+      <a href="/home" class="px-4 py-2 rounded bg-white text-black font-semibold hover:bg-zinc-200">Go to Home</a>
+      <a href="/compare" class="px-4 py-2 rounded border border-zinc-700 hover:border-zinc-500">Compare Files</a>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
+      <p class="text-zinc-400 text-sm">Account</p>
+      <p class="text-lg font-semibold mt-1">{{ user.username }}</p>
+      <p class="text-zinc-500 text-xs mt-1">{{ user.email }}</p>
+    </div>
+
+    <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
+      <p class="text-zinc-400 text-sm">Hashes Stored</p>
+      <p class="text-3xl font-bold mt-1">{{ hashes_count }}</p>
+      <p class="text-zinc-500 text-xs mt-1">Total registered file hashes</p>
+    </div>
+
+    <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
+      <p class="text-zinc-400 text-sm">Tamper Alerts</p>
+      <p class="text-3xl font-bold mt-1">{{ tamper_count }}</p>
+      <p class="text-zinc-500 text-xs mt-1">Mismatched verification events</p>
+    </div>
+  </div>
+
+  <!-- Recent Hashes -->
+  <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">Recent Registered Hashes</h3>
+      <span class="text-zinc-400 text-sm">Last 20</span>
+    </div>
+
+    <div class="overflow-x-auto mt-4">
+      <table class="min-w-full text-sm">
+        <thead class="text-zinc-400">
+          <tr class="border-b border-zinc-800">
+            <th class="text-left py-2 pr-4">Filename</th>
+            <th class="text-left py-2 pr-4">Size</th>
+            <th class="text-left py-2 pr-4">SHA-256</th>
+            <th class="text-left py-2 pr-4">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if hashes and hashes|length > 0 %}
+            {% for h in hashes %}
+              <tr class="border-b border-zinc-800/60">
+                <td class="py-2 pr-4 text-zinc-200">{{ h.filename }}</td>
+                <td class="py-2 pr-4 text-zinc-300">{{ h.filesize }} bytes</td>
+                <td class="py-2 pr-4 text-zinc-300">
+                  <span class="font-mono text-xs break-all">{{ h.sha256 }}</span>
+                </td>
+                <td class="py-2 pr-4 text-zinc-400">
+                  {{ h.created_at }}
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="4" class="py-4 text-zinc-400">No hashes stored yet. Go to Home and register a file hash.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tamper Logs -->
+  <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">Tamper Logs</h3>
+      <span class="text-zinc-400 text-sm">Last 20</span>
+    </div>
+
+    <div class="overflow-x-auto mt-4">
+      <table class="min-w-full text-sm">
+        <thead class="text-zinc-400">
+          <tr class="border-b border-zinc-800">
+            <th class="text-left py-2 pr-4">Filename</th>
+            <th class="text-left py-2 pr-4">Expected</th>
+            <th class="text-left py-2 pr-4">Actual</th>
+            <th class="text-left py-2 pr-4">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if tampers and tampers|length > 0 %}
+            {% for t in tampers %}
+              <tr class="border-b border-zinc-800/60">
+                <td class="py-2 pr-4 text-zinc-200">{{ t.filename }}</td>
+                <td class="py-2 pr-4 text-zinc-300">
+                  <span class="font-mono text-xs break-all">{{ t.expected_sha256 }}</span>
+                </td>
+                <td class="py-2 pr-4 text-red-300">
+                  <span class="font-mono text-xs break-all">{{ t.actual_sha256 }}</span>
+                </td>
+                <td class="py-2 pr-4 text-zinc-400">{{ t.created_at }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="4" class="py-4 text-zinc-400">No tamper alerts yet. That’s a good sign 🙂</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

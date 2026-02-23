@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Forgot Password - IntegrityCloud{% endblock %}
+
+{% block content %}
+<div class="flex justify-center items-center h-[75vh]">
+  <form method="POST" class="bg-zinc-900/90 backdrop-blur p-8 rounded-xl w-[28rem] border border-zinc-800">
+    <h2 class="text-2xl font-bold mb-2 text-center">Forgot Password</h2>
+    <p class="text-sm text-zinc-400 text-center mb-6">We’ll generate a reset link</p>
+
+    {% if message %}
+      <div class="bg-emerald-900/30 border border-emerald-700 text-emerald-200 px-4 py-2 rounded mb-4 text-sm">
+        {{ message }}
+      </div>
+    {% endif %}
+
+    <label class="text-sm text-zinc-300">Email</label>
+    <input name="email" type="email" placeholder="you@example.com"
+           class="w-full mb-4 mt-1 p-2 text-black rounded" required>
+
+    <button class="w-full bg-white text-black py-2 rounded font-semibold hover:bg-zinc-200">
+      Generate Reset Link
+    </button>
+
+    {% if reset_link %}
+      <div class="mt-4 bg-zinc-950 border border-zinc-800 rounded p-3 text-sm">
+        <p class="text-zinc-300 mb-2">Demo mode reset link (copy & open):</p>
+        <a class="break-all text-blue-300 hover:text-blue-200 underline" href="{{ reset_link }}">{{ reset_link }}</a>
+      </div>
+    {% endif %}
+
+    <div class="mt-4 text-sm text-zinc-300 text-center">
+      <a href="/" class="hover:text-white underline">Back to Login</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

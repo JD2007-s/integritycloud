@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Sign Up - IntegrityCloud{% endblock %}
+
+{% block content %}
+<div class="flex justify-center items-center h-[80vh]">
+  <form method="POST" class="bg-zinc-900/90 backdrop-blur p-8 rounded-xl w-96 border border-zinc-800">
+    <h2 class="text-2xl font-bold mb-2 text-center">Create Account</h2>
+    <p class="text-sm text-zinc-400 text-center mb-6">Start using IntegrityCloud as SaaS</p>
+
+    {% if error %}
+      <div class="bg-red-900/40 border border-red-700 text-red-200 px-4 py-2 rounded mb-4 text-sm">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <label class="text-sm text-zinc-300">Username</label>
+    <input name="username" placeholder="Choose a username"
+           class="w-full mb-3 mt-1 p-2 text-black rounded" required>
+
+    <label class="text-sm text-zinc-300">Email</label>
+    <input name="email" type="email" placeholder="you@example.com"
+           class="w-full mb-3 mt-1 p-2 text-black rounded" required>
+
+    <label class="text-sm text-zinc-300">Password</label>
+    <input name="password" type="password" placeholder="Minimum 6 characters"
+           class="w-full mb-4 mt-1 p-2 text-black rounded" required>
+
+    <button class="w-full bg-white text-black py-2 rounded font-semibold hover:bg-zinc-200">
+      Sign up
+    </button>
+
+    <div class="mt-4 text-sm text-zinc-300 text-center">
+      Already have an account? <a href="/" class="hover:text-white underline">Login</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

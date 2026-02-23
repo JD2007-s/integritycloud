@@ -2,12 +2,33 @@
 {% block title %}Login - IntegrityCloud{% endblock %}
 
 {% block content %}
-<div class="flex justify-center items-center h-[60vh]">
-  <form method="POST" class="bg-zinc-900 p-8 rounded-xl w-80">
-    <h2 class="text-xl font-bold mb-4 text-center">Login</h2>
-    <input name="username" placeholder="Username" class="w-full mb-3 p-2 text-black rounded">
-    <input name="password" type="password" placeholder="Password" class="w-full mb-4 p-2 text-black rounded">
-    <button class="w-full bg-white text-black py-2 rounded">Login</button>
+<div class="flex justify-center items-center h-[70vh]">
+  <form method="POST" class="bg-zinc-900/90 backdrop-blur p-8 rounded-xl w-96 border border-zinc-800">
+    <h2 class="text-2xl font-bold mb-2 text-center">Login</h2>
+    <p class="text-sm text-zinc-400 text-center mb-6">Access your IntegrityCloud dashboard</p>
+
+    {% if error %}
+      <div class="bg-red-900/40 border border-red-700 text-red-200 px-4 py-2 rounded mb-4 text-sm">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <label class="text-sm text-zinc-300">Username or Email</label>
+    <input name="username" placeholder="e.g. jaynesh or jaynesh@gmail.com"
+           class="w-full mb-3 mt-1 p-2 text-black rounded" required>
+
+    <label class="text-sm text-zinc-300">Password</label>
+    <input name="password" type="password" placeholder="••••••••"
+           class="w-full mb-4 mt-1 p-2 text-black rounded" required>
+
+    <button class="w-full bg-white text-black py-2 rounded font-semibold hover:bg-zinc-200">
+      Login
+    </button>
+
+    <div class="flex justify-between mt-4 text-sm text-zinc-300">
+      <a href="/forgot" class="hover:text-white">Forgot password?</a>
+      <a href="/signup" class="hover:text-white">Create account</a>
+    </div>
   </form>
 </div>
 {% endblock %}
