@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, abort
 import hashlib
 import os
 from datetime import datetime, timezone
+from functools import wraps
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -21,7 +22,6 @@ except Exception:
     MAIL_AVAILABLE = False
 
 
-# -------------------- APP --------------------
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 
@@ -52,7 +52,7 @@ def sha256_bytes(data: bytes) -> str:
 
 
 def _get_database_url():
-    # Supports both keys: DATABASE_URL (standard) and your current DATABASE_URL
+    # Supports both keys: DATABASE_URL (standard) and DATABASE_URL (your earlier one)
     return os.environ.get("DATABASE_URL") or os.environ.get("DATABASE_URL")
 
 
@@ -60,7 +60,6 @@ def get_db():
     db_url = _get_database_url()
     if not db_url:
         raise RuntimeError("Database URL not set. Set DATABASE_URL (recommended) or DATABASE_URL in Render.")
-    # sslmode=require is common for hosted Postgres
     return psycopg2.connect(db_url, sslmode="require", cursor_factory=RealDictCursor)
 
 
@@ -68,18 +67,17 @@ def init_db():
     conn = get_db()
     cur = conn.cursor()
 
-    # Users table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(100) UNIQUE NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
     """)
 
-    # File hashes table (user-based)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS file_hashes (
         id SERIAL PRIMARY KEY,
@@ -93,7 +91,6 @@ def init_db():
     )
     """)
 
-    # Tamper logs table (user-based)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS tamper_logs (
         id SERIAL PRIMARY KEY,
@@ -107,7 +104,6 @@ def init_db():
     )
     """)
 
-    # Indexes
     cur.execute("CREATE INDEX IF NOT EXISTS idx_file_hashes_user_id ON file_hashes(user_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_tamper_logs_user_id ON tamper_logs(user_id)")
 
@@ -116,7 +112,6 @@ def init_db():
     conn.close()
 
 
-# Create tables at startup on Render
 try:
     init_db()
 except Exception as e:
@@ -125,27 +120,41 @@ except Exception as e:
 
 # -------------------- USER MODEL --------------------
 class User(UserMixin):
-    def __init__(self, id, username, email, password_hash):
+    def __init__(self, id, username, email, password_hash, role="user"):
         self.id = str(id)
         self.username = username
         self.email = email
         self.password_hash = password_hash
+        self.role = role or "user"
+
+    @property
+    def is_admin(self):
+        return self.role == "admin"
 
 
 @login_manager.user_loader
 def load_user(user_id):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id, username, email, password_hash FROM users WHERE id=%s", (user_id,))
+    cur.execute("SELECT id, username, email, password_hash, role FROM users WHERE id=%s", (user_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
     if not row:
         return None
-    return User(row["id"], row["username"], row["email"], row["password_hash"])
+    return User(row["id"], row["username"], row["email"], row["password_hash"], row["role"])
 
 
-# -------------------- AUTH ROUTES --------------------
+def admin_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            return abort(403)
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+# -------------------- AUTH --------------------
 @app.route("/", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
@@ -158,7 +167,7 @@ def login():
         conn = get_db()
         cur = conn.cursor()
         cur.execute("""
-            SELECT id, username, email, password_hash
+            SELECT id, username, email, password_hash, role
             FROM users
             WHERE lower(username)=%s OR lower(email)=%s
             LIMIT 1
@@ -168,7 +177,7 @@ def login():
         conn.close()
 
         if row and check_password_hash(row["password_hash"], password):
-            login_user(User(row["id"], row["username"], row["email"], row["password_hash"]))
+            login_user(User(row["id"], row["username"], row["email"], row["password_hash"], row["role"]))
             return redirect(url_for("dashboard"))
 
         return render_template("login.html", error="Invalid username/email or password")
@@ -198,10 +207,10 @@ def signup():
         cur = conn.cursor()
         try:
             cur.execute(
-                "INSERT INTO users(username,email,password_hash) VALUES (%s,%s,%s) RETURNING id",
+                "INSERT INTO users(username,email,password_hash) VALUES (%s,%s,%s) RETURNING id, role",
                 (username, email, pw_hash)
             )
-            new_id = cur.fetchone()["id"]
+            created = cur.fetchone()
             conn.commit()
         except Exception:
             conn.rollback()
@@ -212,8 +221,7 @@ def signup():
         cur.close()
         conn.close()
 
-        # auto login after signup
-        login_user(User(new_id, username, email, pw_hash))
+        login_user(User(created["id"], username, email, pw_hash, created["role"]))
         return redirect(url_for("dashboard"))
 
     return render_template("signup.html")
@@ -226,7 +234,7 @@ def logout():
     return redirect(url_for("login"))
 
 
-# -------------------- FORGOT / RESET PASSWORD --------------------
+# -------------------- FORGOT / RESET --------------------
 @app.route("/forgot", methods=["GET", "POST"])
 def forgot():
     if request.method == "POST":
@@ -239,26 +247,25 @@ def forgot():
         cur.close()
         conn.close()
 
-        # Always return same message for security
         reset_link = None
         if row:
             token = serializer.dumps({"user_id": row["id"]})
             base = (os.environ.get("APP_BASE_URL") or request.host_url).rstrip("/")
             reset_link = f"{base}{url_for('reset_password', token=token)}"
 
-            # If SMTP configured, send email; else show link on screen (demo mode)
+            # Send mail if SMTP configured, else show link on page (demo mode)
             if MAIL_AVAILABLE and app.config.get("MAIL_SERVER") and app.config.get("MAIL_USERNAME") and app.config.get("MAIL_PASSWORD"):
                 try:
                     msg = Message("Password Reset - IntegrityCloud", recipients=[row["email"]])
                     msg.body = f"Reset your password (valid 30 minutes): {reset_link}"
                     mail.send(msg)
+                    reset_link = None  # hide it if sent
                 except Exception as e:
                     print("Mail send failed:", e)
 
-        # For demo: show link if email not configured
         return render_template(
             "forgot.html",
-            message="If the email exists, a reset link has been generated.",
+            message="If the email exists, a reset link has been generated/sent.",
             reset_link=reset_link
         )
 
@@ -268,7 +275,7 @@ def forgot():
 @app.route("/reset/<token>", methods=["GET", "POST"])
 def reset_password(token):
     try:
-        data = serializer.loads(token, max_age=1800)  # 30 minutes
+        data = serializer.loads(token, max_age=1800)
         user_id = data["user_id"]
     except SignatureExpired:
         return "Reset link expired. Please request again.", 400
@@ -338,7 +345,89 @@ def dashboard():
     )
 
 
-# Keep your existing UI page names if you want
+# -------------------- ADMIN PANEL --------------------
+@app.route("/admin")
+@login_required
+@admin_required
+def admin_panel():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("SELECT COUNT(*) AS c FROM users")
+    total_users = cur.fetchone()["c"]
+
+    cur.execute("SELECT COUNT(*) AS c FROM file_hashes")
+    total_hashes = cur.fetchone()["c"]
+
+    cur.execute("SELECT COUNT(*) AS c FROM tamper_logs")
+    total_tampers = cur.fetchone()["c"]
+
+    cur.execute("""
+    SELECT id, username, email, role, created_at
+    FROM users
+    ORDER BY id DESC
+    LIMIT 30
+""")
+    users = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "admin.html",
+        total_users=total_users,
+        total_hashes=total_hashes,
+        total_tampers=total_tampers,
+        users=users
+    )
+@app.route("/admin/promote/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def promote_user(user_id):
+    if int(current_user.id) == user_id:
+        return abort(400, "You cannot modify your own role.")
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET role='admin' WHERE id=%s", (user_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return redirect(url_for("admin_panel"))
+
+@app.route("/admin/demote/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def demote_user(user_id):
+    if int(current_user.id) == user_id:
+        return abort(400, "You cannot demote yourself.")
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET role='user' WHERE id=%s", (user_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return redirect(url_for("admin_panel"))
+
+@app.route("/admin/delete/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def delete_user(user_id):
+    if int(current_user.id) == user_id:
+        return abort(400, "You cannot delete yourself.")
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return redirect(url_for("admin_panel"))
+# -------------------- PAGES --------------------
 @app.route("/home")
 @login_required
 def home():
@@ -351,7 +440,7 @@ def compare_page():
     return render_template("compare.html")
 
 
-# -------------------- API: REGISTER (STORE HASH) --------------------
+# -------------------- API --------------------
 @app.route("/api/register", methods=["POST"])
 @login_required
 def api_register():
@@ -387,7 +476,6 @@ def api_register():
     })
 
 
-# -------------------- API: VERIFY INTEGRITY --------------------
 @app.route("/api/verify", methods=["POST"])
 @login_required
 def api_verify():
@@ -463,7 +551,6 @@ def api_verify():
     })
 
 
-# -------------------- API: COMPARE TWO FILES --------------------
 @app.route("/api/compare", methods=["POST"])
 @login_required
 def api_compare():
