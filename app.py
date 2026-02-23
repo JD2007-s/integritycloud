@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 import hashlib
 import os
 from datetime import datetime, timezone
@@ -6,26 +6,61 @@ from datetime import datetime, timezone
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+from flask_login import (
+    LoginManager, UserMixin,
+    login_user, login_required, logout_user, current_user
+)
+from werkzeug.security import generate_password_hash, check_password_hash
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
+# Optional email (works only if env vars are set)
+try:
+    from flask_mail import Mail, Message
+    MAIL_AVAILABLE = True
+except Exception:
+    MAIL_AVAILABLE = False
+
+
+# -------------------- APP --------------------
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 
+login_manager = LoginManager()
+login_manager.login_view = "login"
+login_manager.init_app(app)
 
-# Dummy login credentials (same as your code)
-USERNAME = "admin"
-PASSWORD = "admin123"
+serializer = URLSafeTimedSerializer(app.secret_key)
+
+mail = Mail(app)
+if MAIL_AVAILABLE:
+    app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER")
+    app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", "587"))
+    app.config["MAIL_USE_TLS"] = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
+    app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME")
+    app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
+    app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER")
+    mail.init_app(app)
 
 
-# -------------------- DB (PostgreSQL on Render) --------------------
+# -------------------- HELPERS --------------------
+def utc_now():
+    return datetime.now(timezone.utc)
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _get_database_url():
+    # Supports both keys: DATABASE_URL (standard) and your current DATABASE_URL
+    return os.environ.get("DATABASE_URL") or os.environ.get("DATABASE_URL")
+
+
 def get_db():
-    """
-    Connect to Render PostgreSQL using DATABASE_URL env var.
-    sslmode=require is commonly needed for external Postgres URLs.
-    """
-    db_url = os.environ.get("DATABASE_URL")
+    db_url = _get_database_url()
     if not db_url:
-        raise RuntimeError("DATABASE_URL environment variable is not set.")
-
+        raise RuntimeError("Database URL not set. Set DATABASE_URL (recommended) or DATABASE_URL in Render.")
+    # sslmode=require is common for hosted Postgres
     return psycopg2.connect(db_url, sslmode="require", cursor_factory=RealDictCursor)
 
 
@@ -33,91 +68,293 @@ def init_db():
     conn = get_db()
     cur = conn.cursor()
 
-    # file_hashes table
+    # Users table
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(100) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """)
+
+    # File hashes table (user-based)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS file_hashes (
         id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
         username TEXT NOT NULL,
         filename TEXT NOT NULL,
         filesize INTEGER NOT NULL,
         sha256 TEXT NOT NULL,
-        created_at TIMESTAMP NOT NULL
+        created_at TIMESTAMP NOT NULL,
+        CONSTRAINT fk_filehash_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
     """)
 
-    # tamper_logs table
+    # Tamper logs table (user-based)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS tamper_logs (
         id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
         username TEXT NOT NULL,
         filename TEXT NOT NULL,
         expected_sha256 TEXT NOT NULL,
         actual_sha256 TEXT NOT NULL,
-        created_at TIMESTAMP NOT NULL
+        created_at TIMESTAMP NOT NULL,
+        CONSTRAINT fk_tamper_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
     """)
+
+    # Indexes
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_file_hashes_user_id ON file_hashes(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_tamper_logs_user_id ON tamper_logs(user_id)")
 
     conn.commit()
     cur.close()
     conn.close()
 
 
-# Initialize DB tables at startup
-# (Render will run this when service boots)
+# Create tables at startup on Render
 try:
     init_db()
 except Exception as e:
-    # Don't crash local dev if DATABASE_URL isn't set.
-    # On Render, DATABASE_URL will be set.
-    print("DB init warning:", str(e))
+    print("DB init warning:", e)
 
 
-# -------------------- HASH --------------------
-def sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+# -------------------- USER MODEL --------------------
+class User(UserMixin):
+    def __init__(self, id, username, email, password_hash):
+        self.id = str(id)
+        self.username = username
+        self.email = email
+        self.password_hash = password_hash
 
 
-def utc_now():
-    return datetime.now(timezone.utc)
+@login_manager.user_loader
+def load_user(user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, username, email, password_hash FROM users WHERE id=%s", (user_id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not row:
+        return None
+    return User(row["id"], row["username"], row["email"], row["password_hash"])
 
 
-# -------------------- AUTH --------------------
+# -------------------- AUTH ROUTES --------------------
 @app.route("/", methods=["GET", "POST"])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+
     if request.method == "POST":
-        if request.form.get("username") == USERNAME and request.form.get("password") == PASSWORD:
-            session["user"] = USERNAME
-            return redirect("/home")
+        user_input = (request.form.get("username") or "").strip().lower()
+        password = request.form.get("password") or ""
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, username, email, password_hash
+            FROM users
+            WHERE lower(username)=%s OR lower(email)=%s
+            LIMIT 1
+        """, (user_input, user_input))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if row and check_password_hash(row["password_hash"], password):
+            login_user(User(row["id"], row["username"], row["email"], row["password_hash"]))
+            return redirect(url_for("dashboard"))
+
+        return render_template("login.html", error="Invalid username/email or password")
+
     return render_template("login.html")
 
 
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
+
+        if not username or not email or not password:
+            return render_template("signup.html", error="All fields are required")
+
+        if len(password) < 6:
+            return render_template("signup.html", error="Password must be at least 6 characters")
+
+        pw_hash = generate_password_hash(password)
+
+        conn = get_db()
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "INSERT INTO users(username,email,password_hash) VALUES (%s,%s,%s) RETURNING id",
+                (username, email, pw_hash)
+            )
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            cur.close()
+            conn.close()
+            return render_template("signup.html", error="Username or Email already exists")
+
+        cur.close()
+        conn.close()
+
+        # auto login after signup
+        login_user(User(new_id, username, email, pw_hash))
+        return redirect(url_for("dashboard"))
+
+    return render_template("signup.html")
+
+
 @app.route("/logout")
+@login_required
 def logout():
-    session.clear()
-    return redirect("/")
+    logout_user()
+    return redirect(url_for("login"))
 
 
-# -------------------- PAGES --------------------
+# -------------------- FORGOT / RESET PASSWORD --------------------
+@app.route("/forgot", methods=["GET", "POST"])
+def forgot():
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT id, email FROM users WHERE lower(email)=%s LIMIT 1", (email,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        # Always return same message for security
+        reset_link = None
+        if row:
+            token = serializer.dumps({"user_id": row["id"]})
+            base = (os.environ.get("APP_BASE_URL") or request.host_url).rstrip("/")
+            reset_link = f"{base}{url_for('reset_password', token=token)}"
+
+            # If SMTP configured, send email; else show link on screen (demo mode)
+            if MAIL_AVAILABLE and app.config.get("MAIL_SERVER") and app.config.get("MAIL_USERNAME") and app.config.get("MAIL_PASSWORD"):
+                try:
+                    msg = Message("Password Reset - IntegrityCloud", recipients=[row["email"]])
+                    msg.body = f"Reset your password (valid 30 minutes): {reset_link}"
+                    mail.send(msg)
+                except Exception as e:
+                    print("Mail send failed:", e)
+
+        # For demo: show link if email not configured
+        return render_template(
+            "forgot.html",
+            message="If the email exists, a reset link has been generated.",
+            reset_link=reset_link
+        )
+
+    return render_template("forgot.html")
+
+
+@app.route("/reset/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    try:
+        data = serializer.loads(token, max_age=1800)  # 30 minutes
+        user_id = data["user_id"]
+    except SignatureExpired:
+        return "Reset link expired. Please request again.", 400
+    except BadSignature:
+        return "Invalid reset link.", 400
+
+    if request.method == "POST":
+        new_password = request.form.get("password") or ""
+        if len(new_password) < 6:
+            return render_template("reset.html", error="Password must be at least 6 characters")
+
+        pw_hash = generate_password_hash(new_password)
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET password_hash=%s WHERE id=%s", (pw_hash, user_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return redirect(url_for("login"))
+
+    return render_template("reset.html")
+
+
+# -------------------- DASHBOARD --------------------
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("SELECT COUNT(*) AS c FROM file_hashes WHERE user_id=%s", (int(current_user.id),))
+    hashes_count = cur.fetchone()["c"]
+
+    cur.execute("SELECT COUNT(*) AS c FROM tamper_logs WHERE user_id=%s", (int(current_user.id),))
+    tamper_count = cur.fetchone()["c"]
+
+    cur.execute("""
+        SELECT filename, filesize, sha256, created_at
+        FROM file_hashes
+        WHERE user_id=%s
+        ORDER BY id DESC
+        LIMIT 20
+    """, (int(current_user.id),))
+    hashes = cur.fetchall()
+
+    cur.execute("""
+        SELECT filename, expected_sha256, actual_sha256, created_at
+        FROM tamper_logs
+        WHERE user_id=%s
+        ORDER BY id DESC
+        LIMIT 20
+    """, (int(current_user.id),))
+    tampers = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "dashboard.html",
+        user=current_user,
+        hashes_count=hashes_count,
+        tamper_count=tamper_count,
+        hashes=hashes,
+        tampers=tampers
+    )
+
+
+# Keep your existing UI page names if you want
 @app.route("/home")
+@login_required
 def home():
-    if "user" not in session:
-        return redirect("/")
     return render_template("index.html")
 
 
 @app.route("/compare")
+@login_required
 def compare_page():
-    if "user" not in session:
-        return redirect("/")
     return render_template("compare.html")
 
 
 # -------------------- API: REGISTER (STORE HASH) --------------------
 @app.route("/api/register", methods=["POST"])
+@login_required
 def api_register():
-    if "user" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 
@@ -133,12 +370,10 @@ def api_register():
 
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("""
-      INSERT INTO file_hashes (username, filename, filesize, sha256, created_at)
-      VALUES (%s, %s, %s, %s, %s)
-    """, (session["user"], filename, filesize, file_hash, now))
-
+      INSERT INTO file_hashes (user_id, username, filename, filesize, sha256, created_at)
+      VALUES (%s, %s, %s, %s, %s, %s)
+    """, (int(current_user.id), current_user.username, filename, filesize, file_hash, now))
     conn.commit()
     cur.close()
     conn.close()
@@ -154,10 +389,8 @@ def api_register():
 
 # -------------------- API: VERIFY INTEGRITY --------------------
 @app.route("/api/verify", methods=["POST"])
+@login_required
 def api_verify():
-    if "user" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 
@@ -173,15 +406,13 @@ def api_verify():
     conn = get_db()
     cur = conn.cursor()
 
-    # Find latest stored hash for this filename (per user)
     cur.execute("""
       SELECT sha256, created_at
       FROM file_hashes
-      WHERE username = %s AND filename = %s
+      WHERE user_id=%s AND filename=%s
       ORDER BY id DESC
       LIMIT 1
-    """, (session["user"], filename))
-
+    """, (int(current_user.id), filename))
     row = cur.fetchone()
 
     if not row:
@@ -211,13 +442,11 @@ def api_verify():
             "actual_hash": actual_hash
         })
 
-    # Tampered → log it
     now = utc_now()
     cur.execute("""
-      INSERT INTO tamper_logs (username, filename, expected_sha256, actual_sha256, created_at)
-      VALUES (%s, %s, %s, %s, %s)
-    """, (session["user"], filename, expected_hash, actual_hash, now))
-
+      INSERT INTO tamper_logs (user_id, username, filename, expected_sha256, actual_sha256, created_at)
+      VALUES (%s, %s, %s, %s, %s, %s)
+    """, (int(current_user.id), current_user.username, filename, expected_hash, actual_hash, now))
     conn.commit()
     cur.close()
     conn.close()
@@ -236,10 +465,8 @@ def api_verify():
 
 # -------------------- API: COMPARE TWO FILES --------------------
 @app.route("/api/compare", methods=["POST"])
+@login_required
 def api_compare():
-    if "user" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-
     if "file1" not in request.files or "file2" not in request.files:
         return jsonify({"error": "Both files are required"}), 400
 
@@ -255,15 +482,12 @@ def api_compare():
     h1 = sha256_bytes(d1)
     h2 = sha256_bytes(d2)
 
-    same = (h1 == h2)
-
     return jsonify({
         "file1": {"name": f1.filename or "file1", "size": len(d1), "hash": h1},
         "file2": {"name": f2.filename or "file2", "size": len(d2), "hash": h2},
-        "result": "MATCH" if same else "MISMATCH"
+        "result": "MATCH" if h1 == h2 else "MISMATCH"
     })
 
 
 if __name__ == "__main__":
-    # Local dev only; Render uses gunicorn
     app.run(debug=True)
