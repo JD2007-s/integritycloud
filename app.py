@@ -4,6 +4,7 @@ from flask import (
 )
 import hashlib
 import os
+import sys
 from datetime import datetime, timezone
 from functools import wraps
 from contextlib import contextmanager
@@ -52,22 +53,22 @@ if MAIL_AVAILABLE:
 def utc_now():
     return datetime.now(timezone.utc)
 
-
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
-
 
 def get_database_url():
     # Render provides DATABASE_URL for Postgres
     return os.environ.get("DATABASE_URL")
-
 
 @contextmanager
 def db_cursor():
     db_url = get_database_url()
     if not db_url:
         raise RuntimeError("DATABASE_URL not set in Render Environment Variables.")
-    conn = psycopg.connect(db_url, sslmode="require", row_factory=dict_row)
+    
+    # FIX: Removed hardcoded sslmode="require". 
+    # Render's internal URLs don't support it, and external URLs already include it.
+    conn = psycopg.connect(db_url, row_factory=dict_row)
     try:
         cur = conn.cursor()
         yield conn, cur
@@ -146,10 +147,15 @@ def init_db():
             print("✅ Default admin created.")
 
 
+# FIX: Do not silently ignore initialization errors. 
+# If DB fails to create, the app must stop so you can see the error in Render Logs!
 try:
     init_db()
+    print("✅ Database tables verified/created successfully.")
 except Exception as e:
-    print("DB init error:", e)
+    print(f"❌ CRITICAL DB INIT ERROR: {e}")
+    # Force crash so Gunicorn shows the error in logs instead of 500 error later
+    sys.exit(1)
 
 
 # -------------------- USER MODEL --------------------
@@ -363,8 +369,6 @@ def dashboard():
     user_id = int(current_user.id)
 
     with db_cursor() as (conn, cur):
-        user_id = int(current_user.id)
-
         cur.execute("SELECT COUNT(*) AS c FROM file_hashes WHERE user_id=%s", (user_id,))
         hashes_count = cur.fetchone()["c"]
 
