@@ -360,12 +360,13 @@ def compare_page():
 @login_required
 def dashboard():
     user_id = int(current_user.id)
-    with db_cursor() as (conn, cur):
-        cur.execute("SELECT COUNT(*) AS c FROM file_hashes WHERE user_id=%s", (user_id,))
-        hashes_count = cur.fetchone()["c"]
 
-        cur.execute("SELECT COUNT(*) AS c FROM tamper_logs WHERE user_id=%s", (user_id,))
-        tamper_count = cur.fetchone()["c"]
+    with db_cursor() as (conn, cur):
+        cur.execute("SELECT COUNT(*) FROM file_hashes WHERE user_id=%s", (user_id,))
+        hashes_count = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM tamper_logs WHERE user_id=%s", (user_id,))
+        tamper_count = cur.fetchone()[0]
 
         cur.execute("""
             SELECT filename, filesize, sha256, created_at
@@ -390,7 +391,6 @@ def dashboard():
         hashes=hashes,
         tampers=tampers
     )
-
 
 # -------------------- ADMIN --------------------
 @app.route("/admin")
