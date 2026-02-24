@@ -2,12 +2,18 @@ const arr = []; // particles
 const c = document.querySelector("canvas");
 const ctx = c.getContext("2d");
 
-// performance-friendly size
-const cw = (c.width = 1400);
-const ch = (c.height = 1400);
+// 1. Make width and height dynamic variables instead of hardcoded numbers
+let cw, ch;
 
-// ✅ No text-mask canvas at all (Option B)
-let ctx2 = null;
+// 2. Create a function to resize the canvas to perfectly fit the screen
+function resizeCanvas() {
+  cw = c.width = window.innerWidth;
+  ch = c.height = window.innerHeight;
+}
+
+// 3. Run it immediately, and listen for screen resizes
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
 
 // start flakes (reduced)
 for (let i = 0; i < 300; i++) makeFlake(i, true);
@@ -22,7 +28,8 @@ function makeFlake(i, ff) {
       x2: -500
     }, {
       ease: 'none',
-      y: ch,
+      // 4. Change 'y: ch' to 'y: () => ch + 15' so it recalculates the bottom of the screen
+      y: () => ch + 15, 
       x: '+=' + 'random(-400, 400, 1)',
       x2: 500
     })
@@ -30,15 +37,15 @@ function makeFlake(i, ff) {
     .timeScale(arr[i].s / 37);
 }
 
-ctx.fillStyle = "#fff";
 gsap.ticker.add(render);
 
 function render() {
   ctx.clearRect(0, 0, cw, ch);
+  
+  // Ensure the snow is always white
+  ctx.fillStyle = "#fff";
 
   arr.forEach((p) => {
-    // ctx2 always null in Option B, so no heavy sampling
-
     ctx.beginPath();
     ctx.arc(
       p.x + p.x2,
