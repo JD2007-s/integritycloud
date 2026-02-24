@@ -1,41 +1,81 @@
 {% extends "base.html" %}
-{% block title %}Compare - IntegrityCloud{% endblock %}
+{% block title %}Compare Files - IntegrityCloud{% endblock %}
 
 {% block content %}
-<div class="bg-zinc-900 p-6 rounded-xl max-w-xl mx-auto">
-  <h2 class="text-xl font-bold mb-2">Compare Two Files</h2>
-  <p class="text-sm text-gray-400 mb-4">Checks if both files are identical using SHA-256.</p>
+<div class="max-w-4xl mx-auto py-8">
+  <div class="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-2xl relative overflow-hidden">
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
 
-{% if current_user.is_admin %}
-  <div class="mt-4 mb-4 bg-amber-900/30 border border-amber-700 rounded p-3 text-sm text-amber-200">
-    Admin Mode enabled. Open 
-    <a href="/admin" class="underline hover:text-amber-100">Admin Panel</a> 
-    to view system-wide stats.
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center p-3 bg-purple-500/10 rounded-full border border-purple-500/20 text-purple-400 mb-4">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+      </div>
+      <h2 class="text-3xl font-extrabold text-white tracking-tight">Direct File Comparison</h2>
+      <p class="text-zinc-400 text-sm mt-2">Upload two files to instantly verify if they are cryptographically identical.</p>
+    </div>
+
+    {% if current_user.is_admin %}
+    <div class="mb-8 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3">
+      <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      <p class="text-sm text-amber-200">
+        <strong class="font-bold text-amber-400">Admin Mode Enabled:</strong> You have system-wide privileges. 
+        <a href="/admin" class="underline decoration-amber-500/50 hover:text-white transition-colors">Access the Admin Panel</a> to view global logs.
+      </p>
+    </div>
+    {% endif %}
+
+    <form id="compareForm" enctype="multipart/form-data" class="space-y-6">
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <div>
+          <label class="block text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-2">
+            <span class="flex items-center justify-center w-5 h-5 rounded bg-zinc-800 text-xs text-zinc-400 font-mono border border-zinc-700">1</span>
+            Original File
+          </label>
+          <label for="file1Input" class="flex flex-col items-center justify-center w-full h-32 border-2 border-zinc-700 border-dashed rounded-xl cursor-pointer bg-black/50 hover:bg-zinc-800 hover:border-purple-500 transition-colors">
+            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+              <svg class="w-8 h-8 mb-2 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+              <p class="text-sm text-zinc-400"><span class="text-white font-medium">Click to browse</span></p>
+            </div>
+            <input id="file1Input" type="file" name="file1" required class="hidden" onchange="document.getElementById('file1Name').textContent = this.files[0].name">
+          </label>
+          <p id="file1Name" class="text-xs text-purple-400 font-mono text-center h-4 mt-2 truncate px-2"></p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-2">
+            <span class="flex items-center justify-center w-5 h-5 rounded bg-zinc-800 text-xs text-zinc-400 font-mono border border-zinc-700">2</span>
+            File to Compare
+          </label>
+          <label for="file2Input" class="flex flex-col items-center justify-center w-full h-32 border-2 border-zinc-700 border-dashed rounded-xl cursor-pointer bg-black/50 hover:bg-zinc-800 hover:border-pink-500 transition-colors">
+            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+              <svg class="w-8 h-8 mb-2 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+              <p class="text-sm text-zinc-400"><span class="text-white font-medium">Click to browse</span></p>
+            </div>
+            <input id="file2Input" type="file" name="file2" required class="hidden" onchange="document.getElementById('file2Name').textContent = this.files[0].name">
+          </label>
+          <p id="file2Name" class="text-xs text-pink-400 font-mono text-center h-4 mt-2 truncate px-2"></p>
+        </div>
+
+      </div>
+
+      <button type="submit" class="w-full bg-white text-black py-4 rounded-xl font-bold text-lg hover:bg-zinc-200 transition-colors shadow-lg flex items-center justify-center gap-2 mt-4">
+        Run Cryptographic Comparison
+      </button>
+    </form>
+
+    <div id="compareOut" class="mt-8 hidden"></div>
   </div>
-{% endif %}
-
-  <form id="compareForm" enctype="multipart/form-data">
-    <label class="text-sm text-gray-300">File 1</label>
-    <input type="file" name="file1" required class="mb-4 block w-full text-sm text-gray-300">
-
-    <label class="text-sm text-gray-300">File 2</label>
-    <input type="file" name="file2" required class="mb-4 block w-full text-sm text-gray-300">
-
-    <button class="bg-white text-black w-full py-2 rounded font-semibold hover:bg-gray-200" type="submit">
-      Compare
-    </button>
-  </form>
-
-  <div id="compareOut" class="mt-5 text-sm hidden"></div>
 </div>
 
 <script>
   document.getElementById("compareForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const out = document.getElementById("compareOut");
-    out.className = "mt-5 text-sm";
+    out.className = "mt-8 p-6 rounded-2xl text-sm font-medium bg-zinc-800 border border-zinc-700 text-zinc-300";
     out.classList.remove("hidden");
-    out.textContent = "Comparing...";
+    out.innerHTML = `<div class="flex flex-col items-center justify-center py-4"><span class="animate-pulse flex items-center gap-3 text-lg"><svg class="animate-spin h-6 w-6 text-purple-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing Hashes...</span></div>`;
 
     try {
       const fd = new FormData(e.target);
@@ -44,23 +84,57 @@
       if (!res.ok) throw new Error(data.error || "Compare failed");
 
       if (data.result === "MATCH") {
-        out.classList.add("text-green-400");
-        out.innerHTML = `🟢 MATCH: Files are identical.<br><br>
-          <span class="text-gray-300">File1:</span> ${data.file1.name} (${data.file1.size} bytes)<br>
-          <span class="text-gray-300">Hash1:</span> <span class="break-all">${data.file1.hash}</span><br><br>
-          <span class="text-gray-300">File2:</span> ${data.file2.name} (${data.file2.size} bytes)<br>
-          <span class="text-gray-300">Hash2:</span> <span class="break-all">${data.file2.hash}</span>`;
+        out.className = "mt-8 p-6 rounded-2xl text-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-inner";
+        out.innerHTML = `
+          <div class="flex items-center justify-center gap-2 font-bold text-xl mb-6">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            MATCH: Files are completely identical.
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-black/40 p-4 rounded-xl border border-emerald-900/50">
+              <span class="inline-block px-2 py-1 bg-zinc-800 text-zinc-300 text-[10px] font-bold tracking-widest uppercase rounded mb-3 border border-zinc-700">File 1</span>
+              <p class="text-white font-medium truncate mb-1" title="${data.file1.name}">${data.file1.name}</p>
+              <p class="text-xs text-zinc-500 mb-3">${data.file1.size} bytes</p>
+              <p class="text-xs font-mono text-emerald-300 break-all leading-relaxed">${data.file1.hash}</p>
+            </div>
+            
+            <div class="bg-black/40 p-4 rounded-xl border border-emerald-900/50">
+              <span class="inline-block px-2 py-1 bg-zinc-800 text-zinc-300 text-[10px] font-bold tracking-widest uppercase rounded mb-3 border border-zinc-700">File 2</span>
+              <p class="text-white font-medium truncate mb-1" title="${data.file2.name}">${data.file2.name}</p>
+              <p class="text-xs text-zinc-500 mb-3">${data.file2.size} bytes</p>
+              <p class="text-xs font-mono text-emerald-300 break-all leading-relaxed">${data.file2.hash}</p>
+            </div>
+          </div>
+        `;
       } else {
-        out.classList.add("text-red-400");
-        out.innerHTML = `🔴 MISMATCH: Files are different.<br><br>
-          <span class="text-gray-300">File1:</span> ${data.file1.name} (${data.file1.size} bytes)<br>
-          <span class="text-gray-300">Hash1:</span> <span class="break-all">${data.file1.hash}</span><br><br>
-          <span class="text-gray-300">File2:</span> ${data.file2.name} (${data.file2.size} bytes)<br>
-          <span class="text-gray-300">Hash2:</span> <span class="break-all">${data.file2.hash}</span>`;
+        out.className = "mt-8 p-6 rounded-2xl text-sm bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-inner";
+        out.innerHTML = `
+          <div class="flex items-center justify-center gap-2 font-bold text-xl mb-6">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            MISMATCH: Files are different.
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-black/40 p-4 rounded-xl border border-rose-900/50">
+              <span class="inline-block px-2 py-1 bg-zinc-800 text-zinc-300 text-[10px] font-bold tracking-widest uppercase rounded mb-3 border border-zinc-700">File 1</span>
+              <p class="text-white font-medium truncate mb-1" title="${data.file1.name}">${data.file1.name}</p>
+              <p class="text-xs text-zinc-500 mb-3">${data.file1.size} bytes</p>
+              <p class="text-xs font-mono text-zinc-400 break-all leading-relaxed">${data.file1.hash}</p>
+            </div>
+            
+            <div class="bg-black/40 p-4 rounded-xl border border-rose-900/50">
+              <span class="inline-block px-2 py-1 bg-zinc-800 text-zinc-300 text-[10px] font-bold tracking-widest uppercase rounded mb-3 border border-zinc-700">File 2</span>
+              <p class="text-white font-medium truncate mb-1" title="${data.file2.name}">${data.file2.name}</p>
+              <p class="text-xs text-zinc-500 mb-3">${data.file2.size} bytes</p>
+              <p class="text-xs font-mono text-rose-300 break-all leading-relaxed font-bold">${data.file2.hash}</p>
+            </div>
+          </div>
+        `;
       }
     } catch (err) {
-      out.classList.add("text-red-400");
-      out.textContent = "❌ " + err.message;
+      out.className = "mt-8 p-6 rounded-2xl text-sm bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-inner text-center font-semibold text-lg";
+      out.innerHTML = `❌ Error: ${err.message}`;
     }
   });
 </script>
