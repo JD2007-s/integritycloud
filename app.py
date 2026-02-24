@@ -19,7 +19,7 @@ from flask_login import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
-# Optional email
+# Optional email (only if env vars configured)
 try:
     from flask_mail import Mail, Message
     MAIL_AVAILABLE = True
@@ -29,7 +29,7 @@ except Exception:
 
 # -------------------- APP SETUP --------------------
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")  # MUST set SECRET_KEY in Render
 
 login_manager = LoginManager()
 login_manager.login_view = "login"
@@ -52,11 +52,15 @@ if MAIL_AVAILABLE:
 def utc_now():
     return datetime.now(timezone.utc)
 
+
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
+
 def get_database_url():
+    # Render provides DATABASE_URL for Postgres
     return os.environ.get("DATABASE_URL")
+
 
 @contextmanager
 def db_cursor():
@@ -74,10 +78,11 @@ def db_cursor():
     finally:
         conn.close()
 
-# -------------------- DATABASE INITIALIZATION & MIGRATION --------------------
+
+# -------------------- DATABASE INIT --------------------
 def init_db():
     with db_cursor() as (conn, cur):
-        # 1. USERS table
+        # Users (soft delete via deleted_at)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -90,7 +95,7 @@ def init_db():
         )
         """)
 
-        # 2. FILE HASHES table
+        # File hashes
         cur.execute("""
         CREATE TABLE IF NOT EXISTS file_hashes (
             id SERIAL PRIMARY KEY,
@@ -105,7 +110,7 @@ def init_db():
         )
         """)
 
-        # 3. TAMPER LOGS table
+        # Tamper logs
         cur.execute("""
         CREATE TABLE IF NOT EXISTS tamper_logs (
             id SERIAL PRIMARY KEY,
@@ -120,29 +125,11 @@ def init_db():
         )
         """)
 
-        # --- AUTO-MIGRATION LOGIC ---
-        # This checks if the user_id column exists. If not, it adds it.
-        # This fixes the "column user_id does not exist" error automatically.
-        for table in ['file_hashes', 'tamper_logs']:
-            cur.execute(f"""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name='{table}' AND column_name='user_id'
-            """)
-            if not cur.fetchone():
-                print(f"⚠️ Migrating {table}: Adding user_id column...")
-                cur.execute(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER;")
-                # Re-add foreign key if it was missing
-                cur.execute(f"""
-                    ALTER TABLE {table} 
-                    ADD CONSTRAINT fk_{table}_user_migrated 
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                """)
-
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_file_hashes_user_id ON file_hashes(user_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tamper_logs_user_id ON tamper_logs(user_id)")
 
-        # Create Admin
+        # Create default admin if no users
         cur.execute("SELECT COUNT(*) AS c FROM users")
         if cur.fetchone()["c"] == 0:
             admin_user = os.environ.get("ADMIN_USERNAME", "admin")
@@ -154,6 +141,7 @@ def init_db():
             """, (admin_user, admin_email, generate_password_hash(admin_pass)))
             print("✅ Default admin created.")
 
+
 try:
     init_db()
 except Exception as e:
@@ -163,7 +151,7 @@ except Exception as e:
 # -------------------- USER MODEL --------------------
 class User(UserMixin):
     def __init__(self, id, username, email, password_hash, role="user"):
-        self.id = id # Keep as original type (int)
+        self.id = id
         self.username = username
         self.email = email
         self.password_hash = password_hash
@@ -175,6 +163,7 @@ class User(UserMixin):
 
     def get_id(self):
         return str(self.id)
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -199,7 +188,7 @@ def admin_required(fn):
     return wrapper
 
 
-# -------------------- ROUTES --------------------
+# -------------------- AUTH --------------------
 @app.route("/", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
@@ -225,9 +214,9 @@ def login():
             return redirect(url_for("dashboard"))
 
         flash("❌ Invalid username/email or password", "error")
-        return render_template("login.html")
 
     return render_template("login.html")
+
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
@@ -257,15 +246,15 @@ def signup():
                     RETURNING id, role
                 """, (username, email, pw_hash))
                 created = cur.fetchone()
-            
+
             login_user(User(created["id"], username, email, pw_hash, created["role"]))
             flash("✅ Account created!", "success")
             return redirect(url_for("dashboard"))
         except Exception:
             flash("❌ Username or Email already exists", "error")
-            return render_template("signup.html")
 
     return render_template("signup.html")
+
 
 @app.route("/logout")
 @login_required
@@ -274,12 +263,100 @@ def logout():
     flash("✅ Logged out", "success")
     return redirect(url_for("login"))
 
+
+# -------------------- FORGOT / RESET --------------------
+@app.route("/forgot", methods=["GET", "POST"])
+def forgot():
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+
+        with db_cursor() as (conn, cur):
+            cur.execute("""
+                SELECT id, email
+                FROM users
+                WHERE deleted_at IS NULL AND lower(email)=%s
+                LIMIT 1
+            """, (email,))
+            row = cur.fetchone()
+
+        reset_link = None
+        if row:
+            token = serializer.dumps({"user_id": row["id"]})
+            base = (os.environ.get("APP_BASE_URL") or request.host_url).rstrip("/")
+            reset_link = f"{base}{url_for('reset_password', token=token)}"
+
+            # Send email if configured, else show link in UI (demo)
+            if (
+                MAIL_AVAILABLE
+                and app.config.get("MAIL_SERVER")
+                and app.config.get("MAIL_USERNAME")
+                and app.config.get("MAIL_PASSWORD")
+                and app.config.get("MAIL_DEFAULT_SENDER")
+            ):
+                try:
+                    msg = Message("Password Reset - IntegrityCloud", recipients=[row["email"]])
+                    msg.body = f"Reset your password (valid 30 minutes): {reset_link}"
+                    mail.send(msg)
+                    reset_link = None
+                except Exception as e:
+                    print("Mail send failed:", e)
+
+        return render_template(
+            "forgot.html",
+            message="If the email exists, a reset link has been generated/sent.",
+            reset_link=reset_link
+        )
+
+    return render_template("forgot.html")
+
+
+@app.route("/reset/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    try:
+        data = serializer.loads(token, max_age=1800)  # 30 min
+        user_id = int(data["user_id"])
+    except SignatureExpired:
+        return "Reset link expired. Please request again.", 400
+    except (BadSignature, KeyError, ValueError):
+        return "Invalid reset link.", 400
+
+    if request.method == "POST":
+        new_password = request.form.get("password") or ""
+        if len(new_password) < 6:
+            return render_template("reset.html", error="Password must be at least 6 characters")
+
+        pw_hash = generate_password_hash(new_password)
+        with db_cursor() as (conn, cur):
+            cur.execute("""
+                UPDATE users SET password_hash=%s
+                WHERE id=%s AND deleted_at IS NULL
+            """, (pw_hash, user_id))
+
+        flash("✅ Password updated. Please login.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("reset.html")
+
+
+# -------------------- PAGES --------------------
+@app.route("/home")
+@login_required
+def home():
+    return render_template("index.html")
+
+
+@app.route("/compare")
+@login_required
+def compare_page():
+    return render_template("compare.html")
+
+
+# -------------------- DASHBOARD --------------------
 @app.route("/dashboard")
 @login_required
 def dashboard():
+    user_id = int(current_user.id)
     with db_cursor() as (conn, cur):
-        user_id = int(current_user.id)
-        
         cur.execute("SELECT COUNT(*) AS c FROM file_hashes WHERE user_id=%s", (user_id,))
         hashes_count = cur.fetchone()["c"]
 
@@ -309,6 +386,91 @@ def dashboard():
         hashes=hashes,
         tampers=tampers
     )
+
+
+# -------------------- ADMIN --------------------
+@app.route("/admin")
+@login_required
+@admin_required
+def admin_panel():
+    with db_cursor() as (conn, cur):
+        cur.execute("SELECT COUNT(*) AS c FROM users WHERE deleted_at IS NULL")
+        total_users = cur.fetchone()["c"]
+
+        cur.execute("SELECT COUNT(*) AS c FROM file_hashes")
+        total_hashes = cur.fetchone()["c"]
+
+        cur.execute("SELECT COUNT(*) AS c FROM tamper_logs")
+        total_tampers = cur.fetchone()["c"]
+
+        cur.execute("""
+            SELECT id, username, email, role, created_at
+            FROM users
+            WHERE deleted_at IS NULL
+            ORDER BY id DESC
+            LIMIT 200
+        """)
+        users = cur.fetchall()
+
+    return render_template(
+        "admin.html",
+        total_users=total_users,
+        total_hashes=total_hashes,
+        total_tampers=total_tampers,
+        users=users
+    )
+
+
+@app.route("/admin/promote/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def promote_user(user_id):
+    if int(current_user.id) == user_id:
+        flash("❌ You cannot modify your own role.", "error")
+        return redirect(url_for("admin_panel"))
+
+    with db_cursor() as (conn, cur):
+        cur.execute("""
+            UPDATE users SET role='admin'
+            WHERE id=%s AND deleted_at IS NULL
+        """, (user_id,))
+    flash("✅ User promoted to admin.", "success")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/demote/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def demote_user(user_id):
+    if int(current_user.id) == user_id:
+        flash("❌ You cannot demote yourself.", "error")
+        return redirect(url_for("admin_panel"))
+
+    with db_cursor() as (conn, cur):
+        cur.execute("""
+            UPDATE users SET role='user'
+            WHERE id=%s AND deleted_at IS NULL
+        """, (user_id,))
+    flash("✅ User set to normal user.", "success")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/delete/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def soft_delete_user(user_id):
+    if int(current_user.id) == user_id:
+        flash("❌ You cannot delete yourself.", "error")
+        return redirect(url_for("admin_panel"))
+
+    with db_cursor() as (conn, cur):
+        cur.execute("""
+            UPDATE users SET deleted_at=%s
+            WHERE id=%s AND deleted_at IS NULL
+        """, (utc_now(), user_id))
+    flash("✅ User soft-deleted.", "success")
+    return redirect(url_for("admin_panel"))
+
 
 # -------------------- API --------------------
 @app.route("/api/register", methods=["POST"])
@@ -341,6 +503,7 @@ def api_register():
         "created_at": now.isoformat()
     })
 
+
 @app.route("/api/verify", methods=["POST"])
 @login_required
 def api_verify():
@@ -353,6 +516,7 @@ def api_verify():
         return jsonify({"error": "Uploaded file is empty"}), 400
 
     actual_hash = sha256_bytes(data)
+    filesize = len(data)
     filename = f.filename or "unknown"
 
     with db_cursor() as (conn, cur):
@@ -365,22 +529,70 @@ def api_verify():
         row = cur.fetchone()
 
         if not row:
-            return jsonify({"status": "NOT_REGISTERED", "filename": filename})
+            return jsonify({
+                "status": "NOT_REGISTERED",
+                "message": "No stored hash found for this filename. Store hash first.",
+                "filename": filename,
+                "filesize": filesize,
+                "actual_hash": actual_hash
+            })
 
         expected_hash = row["sha256"]
-        if expected_hash == actual_hash:
-            return jsonify({"status": "SAFE", "filename": filename})
+        stored_time = row["created_at"]
 
-        # Tampered
+        if expected_hash == actual_hash:
+            return jsonify({
+                "status": "SAFE",
+                "message": "File integrity verified. No changes detected.",
+                "filename": filename,
+                "filesize": filesize,
+                "stored_at": stored_time.isoformat() if stored_time else None,
+                "expected_hash": expected_hash,
+                "actual_hash": actual_hash
+            })
+
+        # Tampered -> log
         now = utc_now()
         cur.execute("""
             INSERT INTO tamper_logs (user_id, username, filename, expected_sha256, actual_sha256, created_at)
             VALUES (%s, %s, %s, %s, %s, %s)
         """, (int(current_user.id), current_user.username, filename, expected_hash, actual_hash, now))
 
-        return jsonify({"status": "TAMPERED", "filename": filename})
+        return jsonify({
+            "status": "TAMPERED",
+            "message": "ALERT: File has been modified (hash mismatch).",
+            "filename": filename,
+            "filesize": filesize,
+            "stored_at": stored_time.isoformat() if stored_time else None,
+            "expected_hash": expected_hash,
+            "actual_hash": actual_hash,
+            "logged_at": now.isoformat()
+        })
 
-# (Keep your other routes like /admin, /home, /compare, etc. exactly as they were)
+
+@app.route("/api/compare", methods=["POST"])
+@login_required
+def api_compare():
+    if "file1" not in request.files or "file2" not in request.files:
+        return jsonify({"error": "Both files are required"}), 400
+
+    f1 = request.files["file1"]
+    f2 = request.files["file2"]
+    d1 = f1.read()
+    d2 = f2.read()
+
+    if not d1 or not d2:
+        return jsonify({"error": "One of the uploaded files is empty"}), 400
+
+    h1 = sha256_bytes(d1)
+    h2 = sha256_bytes(d2)
+
+    return jsonify({
+        "file1": {"name": f1.filename or "file1", "size": len(d1), "hash": h1},
+        "file2": {"name": f2.filename or "file2", "size": len(d2), "hash": h2},
+        "result": "MATCH" if h1 == h2 else "MISMATCH"
+    })
+
 
 if __name__ == "__main__":
     app.run(debug=True)
