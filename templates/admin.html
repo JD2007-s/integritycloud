@@ -1,97 +1,116 @@
 {% extends "base.html" %}
-{% block title %}Admin - IntegrityCloud{% endblock %}
+{% block title %}Admin Panel - IntegrityCloud{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-8 max-w-7xl mx-auto py-6">
 
-  <div class="flex items-start justify-between flex-wrap gap-4">
+  <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 border-b border-zinc-800 pb-6">
     <div>
-      <h2 class="text-2xl font-bold text-amber-300">Admin Panel</h2>
-      <p class="text-zinc-400 text-sm">System-wide overview</p>
+      <h2 class="text-3xl font-extrabold text-amber-400 tracking-tight flex items-center gap-3">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+        Admin Control Panel
+      </h2>
+      <p class="text-zinc-400 text-sm mt-1">System-wide overview and user management</p>
     </div>
     <div class="flex gap-3">
-      <a href="/dashboard" class="px-4 py-2 rounded border border-zinc-700 hover:border-zinc-500">User Dashboard</a>
-      <a href="/home" class="px-4 py-2 rounded bg-white text-black font-semibold hover:bg-zinc-200">Home</a>
+      <a href="/dashboard" class="flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-300 font-medium hover:bg-zinc-700 hover:text-white transition-all duration-200">
+        User Dashboard
+      </a>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
-      <p class="text-zinc-400 text-sm">Total Users</p>
-      <p class="text-3xl font-bold mt-1">{{ total_users }}</p>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-blue-500/50 transition-colors">
+      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        <svg class="w-16 h-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path></svg>
+      </div>
+      <p class="text-zinc-400 text-sm font-medium">Total Registered Users</p>
+      <p class="text-4xl font-extrabold text-blue-400 mt-2">{{ total_users }}</p>
     </div>
-    <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
-      <p class="text-zinc-400 text-sm">Total Hashes</p>
-      <p class="text-3xl font-bold mt-1">{{ total_hashes }}</p>
+
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-emerald-500/50 transition-colors">
+      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        <svg class="w-16 h-16 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+      </div>
+      <p class="text-zinc-400 text-sm font-medium">Global Hashes Stored</p>
+      <p class="text-4xl font-extrabold text-emerald-400 mt-2">{{ total_hashes }}</p>
     </div>
-    <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
-      <p class="text-zinc-400 text-sm">Total Tamper Logs</p>
-      <p class="text-3xl font-bold mt-1">{{ total_tampers }}</p>
+
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-rose-500/50 transition-colors">
+      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        <svg class="w-16 h-16 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+      </div>
+      <p class="text-zinc-400 text-sm font-medium">Global Tamper Alerts</p>
+      <p class="text-4xl font-extrabold text-rose-400 mt-2">{{ total_tampers }}</p>
     </div>
   </div>
 
-  <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
-    <div class="flex items-center justify-between">
-      <h3 class="text-lg font-semibold">Recent Users</h3>
-      <span class="text-zinc-400 text-sm">Last 30</span>
+  <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg mt-8">
+    <div class="px-6 py-5 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
+      <h3 class="text-lg font-bold text-white flex items-center gap-2">
+        <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+        User Database
+      </h3>
+      <span class="px-3 py-1 bg-zinc-800 text-zinc-300 text-xs font-semibold rounded-full">Active Accounts</span>
     </div>
 
-    <div class="overflow-x-auto mt-4">
-      <table class="min-w-full text-sm">
-        <thead class="text-zinc-400">
-          <tr class="border-b border-zinc-800">
-            <th class="text-left py-2 pr-4">Username</th>
-            <th class="text-left py-2 pr-4">Email</th>
-            <th class="text-left py-2 pr-4">Role</th>
-            <th class="text-left py-2 pr-4">Created</th>
-            <th class="text-left py-2 pr-4">Actions</th>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm text-left whitespace-nowrap">
+        <thead class="text-zinc-400 bg-zinc-800/30 uppercase text-xs font-semibold tracking-wider">
+          <tr>
+            <th class="px-6 py-4">Username</th>
+            <th class="px-6 py-4">Email</th>
+            <th class="px-6 py-4">Role</th>
+            <th class="px-6 py-4">Created (UTC)</th>
+            <th class="px-6 py-4 text-right">Actions</th>
           </tr>
         </thead>
-        <tbody>
-  {% for u in users %}
-  <tr class="border-b border-zinc-800/60">
-    <td class="py-2 pr-4 text-zinc-200">{{ u.username }}</td>
-    <td class="py-2 pr-4 text-zinc-300">{{ u.email }}</td>
+        <tbody class="divide-y divide-zinc-800/50">
+          {% for u in users %}
+          <tr class="hover:bg-zinc-800/30 transition-colors">
+            <td class="px-6 py-4 font-medium text-white">{{ u.username }}</td>
+            <td class="px-6 py-4 text-zinc-400">{{ u.email }}</td>
+            
+            <td class="px-6 py-4">
+              {% if u.role == 'admin' %}
+                <span class="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold text-[10px] tracking-wider uppercase rounded-md">Admin</span>
+              {% else %}
+                <span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold text-[10px] tracking-wider uppercase rounded-md">User</span>
+              {% endif %}
+            </td>
+            
+            <td class="px-6 py-4 text-zinc-500">{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else u.created_at }}</td>
+            
+            <td class="px-6 py-4 text-right space-x-2">
+              {% if u.id != current_user.id|string and u.id != current_user.id|int %}
+                
+                {% if u.role == 'user' %}
+                  <form method="POST" action="/admin/promote/{{ u.id }}" class="inline">
+                    <button class="px-3 py-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 rounded border border-amber-400/20 transition-colors">
+                      Promote
+                    </button>
+                  </form>
+                {% else %}
+                  <form method="POST" action="/admin/demote/{{ u.id }}" class="inline">
+                    <button class="px-3 py-1.5 text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded border border-zinc-700 transition-colors">
+                      Demote
+                    </button>
+                  </form>
+                {% endif %}
 
-    <td class="py-2 pr-4 {% if u.role == 'admin' %}text-amber-300{% else %}text-zinc-300{% endif %}">
-      {{ u.role }}
-    </td>
+                <form method="POST" action="/admin/delete/{{ u.id }}" class="inline" onsubmit="return confirm('Are you sure you want to delete this user? This action cannot be undone.');">
+                  <button class="px-3 py-1.5 text-xs font-semibold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 rounded border border-rose-500/20 transition-colors">
+                    Delete
+                  </button>
+                </form>
 
-    <td class="py-2 pr-4 text-zinc-400">{{ u.created_at }}</td>
-
-    <td class="py-2 pr-4 space-x-2">
-
-      {% if u.id != current_user.id %}
-
-        {% if u.role == 'user' %}
-          <form method="POST" action="/admin/promote/{{ u.id }}" class="inline">
-            <button class="px-2 py-1 text-xs bg-emerald-600 hover:bg-emerald-500 rounded">
-              Promote
-            </button>
-          </form>
-        {% else %}
-          <form method="POST" action="/admin/demote/{{ u.id }}" class="inline">
-            <button class="px-2 py-1 text-xs bg-yellow-600 hover:bg-yellow-500 rounded">
-              Demote
-            </button>
-          </form>
-        {% endif %}
-
-        <form method="POST" action="/admin/delete/{{ u.id }}" class="inline"
-              onsubmit="return confirm('Delete this user permanently?');">
-          <button class="px-2 py-1 text-xs bg-red-600 hover:bg-red-500 rounded">
-            Delete
-          </button>
-        </form>
-
-      {% else %}
-        <span class="text-xs text-zinc-500">You</span>
-      {% endif %}
-
-    </td>
-  </tr>
-  {% endfor %}
-</tbody>
+              {% else %}
+                <span class="inline-block px-3 py-1.5 text-xs font-medium text-zinc-500 italic bg-zinc-800/30 rounded border border-zinc-800/50">Current Session</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
       </table>
     </div>
   </div>
