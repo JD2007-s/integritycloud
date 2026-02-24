@@ -1,18 +1,21 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, abort
+from flask import (
+    Flask, render_template, request, redirect, url_for,
+    jsonify, abort, flash
+)
 import hashlib
 import os
 from datetime import datetime, timezone
 from functools import wraps
+from contextlib import contextmanager
 
-import sqlite3
-import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 
 from flask_login import (
     LoginManager, UserMixin,
     login_user, login_required, logout_user, current_user
 )
+
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
@@ -24,6 +27,7 @@ except Exception:
     MAIL_AVAILABLE = False
 
 
+# -------------------- APP SETUP --------------------
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 
@@ -33,7 +37,8 @@ login_manager.init_app(app)
 
 serializer = URLSafeTimedSerializer(app.secret_key)
 
-mail = Mail(app)
+# Mail config (optional)
+mail = Mail()
 if MAIL_AVAILABLE:
     app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER")
     app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", "587"))
@@ -53,71 +58,93 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _get_database_url():
-    # Supports both keys: DATABASE_URL (standard) and DATABASE_URL (your earlier one)
-    return os.environ.get("DATABASE_URL") or os.environ.get("DATABASE_URL")
+def get_database_url():
+    # Render Postgres uses DATABASE_URL usually
+    return os.environ.get("DATABASE_URL")
 
 
-def get_db():
-    db_url = _get_database_url()
+@contextmanager
+def db_cursor():
+    db_url = get_database_url()
     if not db_url:
-        raise RuntimeError("Database URL not set. Set DATABASE_URL (recommended) or DATABASE_URL in Render.")
-    return psycopg2.connect(db_url, sslmode="require", cursor_factory=RealDictCursor)
+        raise RuntimeError("DATABASE_URL not set in Render Environment Variables.")
+    conn = psycopg.connect(db_url, sslmode="require", row_factory=dict_row)
+    try:
+        cur = conn.cursor()
+        yield conn, cur
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def init_db():
-    conn = get_db()
-    cur = conn.cursor()
+    with db_cursor() as (conn, cur):
+        # USERS (soft delete via deleted_at)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(100) UNIQUE NOT NULL,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user',
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            deleted_at TIMESTAMP NULL
+        )
+        """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(100) UNIQUE NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'user',
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
-    )
-    """)
+        # FILE HASHES
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS file_hashes (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            filesize INTEGER NOT NULL,
+            sha256 TEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL,
+            CONSTRAINT fk_filehash_user FOREIGN KEY (user_id)
+                REFERENCES users(id) ON DELETE CASCADE
+        )
+        """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS file_hashes (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        username TEXT NOT NULL,
-        filename TEXT NOT NULL,
-        filesize INTEGER NOT NULL,
-        sha256 TEXT NOT NULL,
-        created_at TIMESTAMP NOT NULL,
-        CONSTRAINT fk_filehash_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-    """)
+        # TAMPER LOGS
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS tamper_logs (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            expected_sha256 TEXT NOT NULL,
+            actual_sha256 TEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL,
+            CONSTRAINT fk_tamper_user FOREIGN KEY (user_id)
+                REFERENCES users(id) ON DELETE CASCADE
+        )
+        """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS tamper_logs (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        username TEXT NOT NULL,
-        filename TEXT NOT NULL,
-        expected_sha256 TEXT NOT NULL,
-        actual_sha256 TEXT NOT NULL,
-        created_at TIMESTAMP NOT NULL,
-        CONSTRAINT fk_tamper_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-    """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_file_hashes_user_id ON file_hashes(user_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tamper_logs_user_id ON tamper_logs(user_id)")
 
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_file_hashes_user_id ON file_hashes(user_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_tamper_logs_user_id ON tamper_logs(user_id)")
-
-    conn.commit()
-    cur.close()
-    conn.close()
+        # Auto-create first admin if no users exist (optional)
+        cur.execute("SELECT COUNT(*) AS c FROM users")
+        if cur.fetchone()["c"] == 0:
+            admin_user = os.environ.get("ADMIN_USERNAME", "admin")
+            admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
+            admin_pass = os.environ.get("ADMIN_PASSWORD", "admin123")
+            cur.execute("""
+                INSERT INTO users (username, email, password_hash, role)
+                VALUES (%s, %s, %s, 'admin')
+            """, (admin_user, admin_email, generate_password_hash(admin_pass)))
+            print("✅ Created default admin user (change via env vars).")
 
 
 try:
     init_db()
 except Exception as e:
-    print("DB init warning:", e)
+    print("DB init error:", e)
 
 
 # -------------------- USER MODEL --------------------
@@ -136,15 +163,16 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT id, username, email, password_hash, role FROM users WHERE id=%s", (user_id,))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    if not row:
-        return None
-    return User(row["id"], row["username"], row["email"], row["password_hash"], row["role"])
+    with db_cursor() as (conn, cur):
+        cur.execute("""
+            SELECT id, username, email, password_hash, role
+            FROM users
+            WHERE id=%s AND deleted_at IS NULL
+        """, (user_id,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        return User(row["id"], row["username"], row["email"], row["password_hash"], row["role"])
 
 
 def admin_required(fn):
@@ -166,23 +194,23 @@ def login():
         user_input = (request.form.get("username") or "").strip().lower()
         password = request.form.get("password") or ""
 
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, username, email, password_hash, role
-            FROM users
-            WHERE lower(username)=%s OR lower(email)=%s
-            LIMIT 1
-        """, (user_input, user_input))
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
+        with db_cursor() as (conn, cur):
+            cur.execute("""
+                SELECT id, username, email, password_hash, role
+                FROM users
+                WHERE deleted_at IS NULL
+                  AND (lower(username)=%s OR lower(email)=%s)
+                LIMIT 1
+            """, (user_input, user_input))
+            row = cur.fetchone()
 
         if row and check_password_hash(row["password_hash"], password):
             login_user(User(row["id"], row["username"], row["email"], row["password_hash"], row["role"]))
+            flash("✅ Logged in successfully!", "success")
             return redirect(url_for("dashboard"))
 
-        return render_template("login.html", error="Invalid username/email or password")
+        flash("❌ Invalid username/email or password", "error")
+        return render_template("login.html")
 
     return render_template("login.html")
 
@@ -198,32 +226,29 @@ def signup():
         password = request.form.get("password") or ""
 
         if not username or not email or not password:
-            return render_template("signup.html", error="All fields are required")
+            flash("❌ All fields are required", "error")
+            return render_template("signup.html")
 
         if len(password) < 6:
-            return render_template("signup.html", error="Password must be at least 6 characters")
+            flash("❌ Password must be at least 6 characters", "error")
+            return render_template("signup.html")
 
         pw_hash = generate_password_hash(password)
 
-        conn = get_db()
-        cur = conn.cursor()
         try:
-            cur.execute(
-                "INSERT INTO users(username,email,password_hash) VALUES (%s,%s,%s) RETURNING id, role",
-                (username, email, pw_hash)
-            )
-            created = cur.fetchone()
-            conn.commit()
+            with db_cursor() as (conn, cur):
+                cur.execute("""
+                    INSERT INTO users(username,email,password_hash,role)
+                    VALUES (%s,%s,%s,'user')
+                    RETURNING id, role
+                """, (username, email, pw_hash))
+                created = cur.fetchone()
         except Exception:
-            conn.rollback()
-            cur.close()
-            conn.close()
-            return render_template("signup.html", error="Username or Email already exists")
-
-        cur.close()
-        conn.close()
+            flash("❌ Username or Email already exists", "error")
+            return render_template("signup.html")
 
         login_user(User(created["id"], username, email, pw_hash, created["role"]))
+        flash("✅ Account created!", "success")
         return redirect(url_for("dashboard"))
 
     return render_template("signup.html")
@@ -233,6 +258,7 @@ def signup():
 @login_required
 def logout():
     logout_user()
+    flash("✅ Logged out", "success")
     return redirect(url_for("login"))
 
 
@@ -242,12 +268,14 @@ def forgot():
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
 
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("SELECT id, email FROM users WHERE lower(email)=%s LIMIT 1", (email,))
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
+        with db_cursor() as (conn, cur):
+            cur.execute("""
+                SELECT id, email
+                FROM users
+                WHERE deleted_at IS NULL AND lower(email)=%s
+                LIMIT 1
+            """, (email,))
+            row = cur.fetchone()
 
         reset_link = None
         if row:
@@ -255,21 +283,19 @@ def forgot():
             base = (os.environ.get("APP_BASE_URL") or request.host_url).rstrip("/")
             reset_link = f"{base}{url_for('reset_password', token=token)}"
 
-            # Send mail if SMTP configured, else show link on page (demo mode)
-            if MAIL_AVAILABLE and app.config.get("MAIL_SERVER") and app.config.get("MAIL_USERNAME") and app.config.get("MAIL_PASSWORD"):
+            # send mail if configured; else show link on page (demo)
+            if (MAIL_AVAILABLE and app.config.get("MAIL_SERVER")
+                    and app.config.get("MAIL_USERNAME") and app.config.get("MAIL_PASSWORD")):
                 try:
                     msg = Message("Password Reset - IntegrityCloud", recipients=[row["email"]])
                     msg.body = f"Reset your password (valid 30 minutes): {reset_link}"
                     mail.send(msg)
-                    reset_link = None  # hide it if sent
+                    reset_link = None
                 except Exception as e:
                     print("Mail send failed:", e)
 
-        return render_template(
-            "forgot.html",
-            message="If the email exists, a reset link has been generated/sent.",
-            reset_link=reset_link
-        )
+        flash("✅ If the email exists, a reset link has been generated/sent.", "success")
+        return render_template("forgot.html", reset_link=reset_link)
 
     return render_template("forgot.html")
 
@@ -287,17 +313,17 @@ def reset_password(token):
     if request.method == "POST":
         new_password = request.form.get("password") or ""
         if len(new_password) < 6:
-            return render_template("reset.html", error="Password must be at least 6 characters")
+            flash("❌ Password must be at least 6 characters", "error")
+            return render_template("reset.html")
 
         pw_hash = generate_password_hash(new_password)
+        with db_cursor() as (conn, cur):
+            cur.execute("""
+                UPDATE users SET password_hash=%s
+                WHERE id=%s AND deleted_at IS NULL
+            """, (pw_hash, user_id))
 
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("UPDATE users SET password_hash=%s WHERE id=%s", (pw_hash, user_id))
-        conn.commit()
-        cur.close()
-        conn.close()
-
+        flash("✅ Password updated. Please login.", "success")
         return redirect(url_for("login"))
 
     return render_template("reset.html")
@@ -307,39 +333,33 @@ def reset_password(token):
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    conn = get_db()
-    cur = conn.cursor()
+    with db_cursor() as (conn, cur):
+        cur.execute("SELECT COUNT(*) AS c FROM file_hashes WHERE user_id=%s", (int(current_user.id),))
+        hashes_count = cur.fetchone()["c"]
 
-    cur.execute("SELECT COUNT(*) AS c FROM file_hashes WHERE user_id=%s", (int(current_user.id),))
-    hashes_count = cur.fetchone()["c"]
+        cur.execute("SELECT COUNT(*) AS c FROM tamper_logs WHERE user_id=%s", (int(current_user.id),))
+        tamper_count = cur.fetchone()["c"]
 
-    cur.execute("SELECT COUNT(*) AS c FROM tamper_logs WHERE user_id=%s", (int(current_user.id),))
-    tamper_count = cur.fetchone()["c"]
+        cur.execute("""
+            SELECT filename, filesize, sha256, created_at
+            FROM file_hashes
+            WHERE user_id=%s
+            ORDER BY id DESC
+            LIMIT 20
+        """, (int(current_user.id),))
+        hashes = cur.fetchall()
 
-    cur.execute("""
-        SELECT filename, filesize, sha256, created_at
-        FROM file_hashes
-        WHERE user_id=%s
-        ORDER BY id DESC
-        LIMIT 20
-    """, (int(current_user.id),))
-    hashes = cur.fetchall()
-
-    cur.execute("""
-        SELECT filename, expected_sha256, actual_sha256, created_at
-        FROM tamper_logs
-        WHERE user_id=%s
-        ORDER BY id DESC
-        LIMIT 20
-    """, (int(current_user.id),))
-    tampers = cur.fetchall()
-
-    cur.close()
-    conn.close()
+        cur.execute("""
+            SELECT filename, expected_sha256, actual_sha256, created_at
+            FROM tamper_logs
+            WHERE user_id=%s
+            ORDER BY id DESC
+            LIMIT 20
+        """, (int(current_user.id),))
+        tampers = cur.fetchall()
 
     return render_template(
         "dashboard.html",
-        user=current_user,
         hashes_count=hashes_count,
         tamper_count=tamper_count,
         hashes=hashes,
@@ -352,28 +372,23 @@ def dashboard():
 @login_required
 @admin_required
 def admin_panel():
-    conn = get_db()
-    cur = conn.cursor()
+    with db_cursor() as (conn, cur):
+        cur.execute("SELECT COUNT(*) AS c FROM users WHERE deleted_at IS NULL")
+        total_users = cur.fetchone()["c"]
 
-    cur.execute("SELECT COUNT(*) AS c FROM users")
-    total_users = cur.fetchone()["c"]
+        cur.execute("SELECT COUNT(*) AS c FROM file_hashes")
+        total_hashes = cur.fetchone()["c"]
 
-    cur.execute("SELECT COUNT(*) AS c FROM file_hashes")
-    total_hashes = cur.fetchone()["c"]
+        cur.execute("SELECT COUNT(*) AS c FROM tamper_logs")
+        total_tampers = cur.fetchone()["c"]
 
-    cur.execute("SELECT COUNT(*) AS c FROM tamper_logs")
-    total_tampers = cur.fetchone()["c"]
-
-    cur.execute("""
-    SELECT id, username, email, role, created_at
-    FROM users
-    ORDER BY id DESC
-    LIMIT 30
-""")
-    users = cur.fetchall()
-
-    cur.close()
-    conn.close()
+        cur.execute("""
+            SELECT id, username, email, role, created_at, deleted_at
+            FROM users
+            ORDER BY id DESC
+            LIMIT 50
+        """)
+        users = cur.fetchall()
 
     return render_template(
         "admin.html",
@@ -382,53 +397,44 @@ def admin_panel():
         total_tampers=total_tampers,
         users=users
     )
+
+
 @app.route("/admin/promote/<int:user_id>", methods=["POST"])
 @login_required
 @admin_required
 def promote_user(user_id):
     if int(current_user.id) == user_id:
-        return abort(400, "You cannot modify your own role.")
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("UPDATE users SET role='admin' WHERE id=%s", (user_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
-
+        abort(400, "You cannot modify your own role.")
+    with db_cursor() as (conn, cur):
+        cur.execute("UPDATE users SET role='admin' WHERE id=%s AND deleted_at IS NULL", (user_id,))
+    flash("✅ User promoted to admin", "success")
     return redirect(url_for("admin_panel"))
+
 
 @app.route("/admin/demote/<int:user_id>", methods=["POST"])
 @login_required
 @admin_required
 def demote_user(user_id):
     if int(current_user.id) == user_id:
-        return abort(400, "You cannot demote yourself.")
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("UPDATE users SET role='user' WHERE id=%s", (user_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
-
+        abort(400, "You cannot demote yourself.")
+    with db_cursor() as (conn, cur):
+        cur.execute("UPDATE users SET role='user' WHERE id=%s AND deleted_at IS NULL", (user_id,))
+    flash("✅ User demoted to user", "success")
     return redirect(url_for("admin_panel"))
+
 
 @app.route("/admin/delete/<int:user_id>", methods=["POST"])
 @login_required
 @admin_required
-def delete_user(user_id):
+def soft_delete_user(user_id):
     if int(current_user.id) == user_id:
-        return abort(400, "You cannot delete yourself.")
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
-
+        abort(400, "You cannot delete yourself.")
+    with db_cursor() as (conn, cur):
+        cur.execute("UPDATE users SET deleted_at=%s WHERE id=%s AND deleted_at IS NULL", (utc_now(), user_id))
+    flash("✅ User soft-deleted (can be restored later)", "success")
     return redirect(url_for("admin_panel"))
+
+
 # -------------------- PAGES --------------------
 @app.route("/home")
 @login_required
@@ -459,15 +465,11 @@ def api_register():
     filename = f.filename or "unknown"
     now = utc_now()
 
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-      INSERT INTO file_hashes (user_id, username, filename, filesize, sha256, created_at)
-      VALUES (%s, %s, %s, %s, %s, %s)
-    """, (int(current_user.id), current_user.username, filename, filesize, file_hash, now))
-    conn.commit()
-    cur.close()
-    conn.close()
+    with db_cursor() as (conn, cur):
+        cur.execute("""
+            INSERT INTO file_hashes (user_id, username, filename, filesize, sha256, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (int(current_user.id), current_user.username, filename, filesize, file_hash, now))
 
     return jsonify({
         "message": "Hash stored successfully",
@@ -493,64 +495,56 @@ def api_verify():
     filesize = len(data)
     filename = f.filename or "unknown"
 
-    conn = get_db()
-    cur = conn.cursor()
+    with db_cursor() as (conn, cur):
+        cur.execute("""
+            SELECT sha256, created_at
+            FROM file_hashes
+            WHERE user_id=%s AND filename=%s
+            ORDER BY id DESC
+            LIMIT 1
+        """, (int(current_user.id), filename))
+        row = cur.fetchone()
 
-    cur.execute("""
-      SELECT sha256, created_at
-      FROM file_hashes
-      WHERE user_id=%s AND filename=%s
-      ORDER BY id DESC
-      LIMIT 1
-    """, (int(current_user.id), filename))
-    row = cur.fetchone()
+        if not row:
+            return jsonify({
+                "status": "NOT_REGISTERED",
+                "message": "No stored hash found for this filename. Please Register/Store hash first.",
+                "filename": filename,
+                "filesize": filesize,
+                "actual_hash": actual_hash
+            })
 
-    if not row:
-        cur.close()
-        conn.close()
+        expected_hash = row["sha256"]
+        stored_time = row["created_at"]
+
+        if expected_hash == actual_hash:
+            return jsonify({
+                "status": "SAFE",
+                "message": "File integrity verified. No changes detected.",
+                "filename": filename,
+                "filesize": filesize,
+                "stored_at": stored_time.isoformat() if stored_time else None,
+                "expected_hash": expected_hash,
+                "actual_hash": actual_hash
+            })
+
+        # tampered -> log it
+        now = utc_now()
+        cur.execute("""
+            INSERT INTO tamper_logs (user_id, username, filename, expected_sha256, actual_sha256, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (int(current_user.id), current_user.username, filename, expected_hash, actual_hash, now))
+
         return jsonify({
-            "status": "NOT_REGISTERED",
-            "message": "No stored hash found for this filename. Please Register/Store hash first.",
-            "filename": filename,
-            "filesize": filesize,
-            "actual_hash": actual_hash
-        })
-
-    expected_hash = row["sha256"]
-    stored_time = row["created_at"]
-
-    if expected_hash == actual_hash:
-        cur.close()
-        conn.close()
-        return jsonify({
-            "status": "SAFE",
-            "message": "File integrity verified. No changes detected.",
+            "status": "TAMPERED",
+            "message": "ALERT: File has been modified (hash mismatch).",
             "filename": filename,
             "filesize": filesize,
             "stored_at": stored_time.isoformat() if stored_time else None,
             "expected_hash": expected_hash,
-            "actual_hash": actual_hash
+            "actual_hash": actual_hash,
+            "logged_at": now.isoformat()
         })
-
-    now = utc_now()
-    cur.execute("""
-      INSERT INTO tamper_logs (user_id, username, filename, expected_sha256, actual_sha256, created_at)
-      VALUES (%s, %s, %s, %s, %s, %s)
-    """, (int(current_user.id), current_user.username, filename, expected_hash, actual_hash, now))
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    return jsonify({
-        "status": "TAMPERED",
-        "message": "ALERT: File has been modified (hash mismatch).",
-        "filename": filename,
-        "filesize": filesize,
-        "stored_at": stored_time.isoformat() if stored_time else None,
-        "expected_hash": expected_hash,
-        "actual_hash": actual_hash,
-        "logged_at": now.isoformat()
-    })
 
 
 @app.route("/api/compare", methods=["POST"])
@@ -578,6 +572,5 @@ def api_compare():
     })
 
 
-print("Register API hit")
 if __name__ == "__main__":
     app.run(debug=True)
