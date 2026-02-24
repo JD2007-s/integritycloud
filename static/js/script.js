@@ -2,18 +2,19 @@ const arr = []; // particles
 const c = document.querySelector("canvas");
 const ctx = c.getContext("2d");
 
-// 1. Make width and height dynamic variables instead of hardcoded numbers
 let cw, ch;
 
-// 2. Create a function to resize the canvas to perfectly fit the screen
+// ✅ 1. Dynamically resize canvas to fit EXACTLY the user's screen
 function resizeCanvas() {
   cw = c.width = window.innerWidth;
   ch = c.height = window.innerHeight;
 }
 
-// 3. Run it immediately, and listen for screen resizes
+// Call immediately and listen for browser resizing
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
+
+let ctx2 = null;
 
 // start flakes (reduced)
 for (let i = 0; i < 300; i++) makeFlake(i, true);
@@ -28,8 +29,8 @@ function makeFlake(i, ff) {
       x2: -500
     }, {
       ease: 'none',
-      // 4. Change 'y: ch' to 'y: () => ch + 15' so it recalculates the bottom of the screen
-      y: () => ch + 15, 
+      // ✅ 2. Tell GSAP to animate past the true bottom of the screen
+      y: () => ch + 20, 
       x: '+=' + 'random(-400, 400, 1)',
       x2: 500
     })
