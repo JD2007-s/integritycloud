@@ -194,6 +194,7 @@ def admin_required(fn):
 
 # -------------------- AUTH --------------------
 @app.route("/", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
@@ -362,11 +363,13 @@ def dashboard():
     user_id = int(current_user.id)
 
     with db_cursor() as (conn, cur):
-        cur.execute("SELECT COUNT(*) FROM file_hashes WHERE user_id=%s", (user_id,))
-        hashes_count = cur.fetchone()[0]
+        user_id = int(current_user.id)
 
-        cur.execute("SELECT COUNT(*) FROM tamper_logs WHERE user_id=%s", (user_id,))
-        tamper_count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) AS c FROM file_hashes WHERE user_id=%s", (user_id,))
+        hashes_count = cur.fetchone()["c"]
+
+        cur.execute("SELECT COUNT(*) AS c FROM tamper_logs WHERE user_id=%s", (user_id,))
+        tamper_count = cur.fetchone()["c"]
 
         cur.execute("""
             SELECT filename, filesize, sha256, created_at
