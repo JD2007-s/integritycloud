@@ -80,7 +80,7 @@ def db_cursor():
 
 @app.get("/health")
 def health():
-    return "ok", 200
+    return "👍", 200
 
 
 # -------------------- DATABASE INIT --------------------
