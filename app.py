@@ -396,9 +396,9 @@ def dashboard():
         hashes_count=hashes_count,
         tamper_count=tamper_count,
         hashes=hashes,
-        tampers=tampers
+        tampers=tampers,
+        user=current_user  
     )
-
 # -------------------- ADMIN --------------------
 @app.route("/admin")
 @login_required
