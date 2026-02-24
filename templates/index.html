@@ -2,61 +2,89 @@
 {% block title %}Home - IntegrityCloud{% endblock %}
 
 {% block content %}
+<div class="max-w-7xl mx-auto py-6">
 
-<!-- Top bar -->
-<div class="flex items-start justify-between flex-wrap gap-4 mb-6">
-  <div>
-    <h2 class="text-2xl font-bold">Home</h2>
-    <p class="text-sm text-zinc-400">
-      Register file hashes and verify integrity (SAFE / TAMPERED).
-    </p>
-    <p class="text-xs text-zinc-500 mt-1">
-      Logged in as: <span class="text-zinc-300">{{ current_user.username }}</span>
-    </p>
+  <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 border-b border-zinc-800 pb-6 mb-8">
+    <div>
+      <h2 class="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+        <svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+        Integrity Engine
+      </h2>
+      <p class="text-zinc-400 text-sm mt-1">Register file hashes to the blockchain-style ledger and verify their integrity.</p>
+    </div>
+    <div class="flex gap-3">
+      <a href="/dashboard" class="flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-300 font-medium hover:bg-zinc-700 hover:text-white transition-all duration-200">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+        Dashboard
+      </a>
+      <a href="/compare" class="flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-300 font-medium hover:bg-zinc-700 hover:text-white transition-all duration-200">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+        Compare
+      </a>
+    </div>
   </div>
 
-  <div class="flex gap-3">
-    <a href="/dashboard" class="px-4 py-2 rounded bg-white text-black font-semibold hover:bg-zinc-200">
-      Dashboard
-    </a>
-    <a href="/compare" class="px-4 py-2 rounded border border-zinc-700 hover:border-zinc-500">
-      Compare Files
-    </a>
+  <div class="grid md:grid-cols-2 gap-8">
+
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-xl relative overflow-hidden group">
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
+      
+      <div class="flex items-center gap-3 mb-2">
+        <div class="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+        <h2 class="text-xl font-bold text-white">Register File Hash</h2>
+      </div>
+      <p class="text-sm text-zinc-400 mb-6">Create a secure fingerprint of your file and store it in the cloud database.</p>
+
+      <form id="registerForm" enctype="multipart/form-data" class="space-y-4">
+        <label for="registerFile" class="flex flex-col items-center justify-center w-full h-32 border-2 border-zinc-700 border-dashed rounded-xl cursor-pointer bg-black/50 hover:bg-zinc-800 hover:border-emerald-500 transition-colors relative">
+          <div class="flex flex-col items-center justify-center pt-5 pb-6">
+            <svg class="w-8 h-8 mb-2 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+            <p class="text-sm text-zinc-400 font-medium"><span class="text-white">Click to browse</span> or drag and drop</p>
+          </div>
+          <input id="registerFile" type="file" name="file" required class="hidden" onchange="document.getElementById('regFileName').textContent = this.files[0].name">
+        </label>
+        <p id="regFileName" class="text-xs text-emerald-400 font-mono text-center h-4"></p>
+
+        <button class="w-full bg-white text-black py-3 rounded-lg font-bold hover:bg-zinc-200 transition-colors shadow-lg flex items-center justify-center gap-2" type="submit">
+          Store Hash Fingerprint
+        </button>
+      </form>
+
+      <div id="registerOut" class="mt-6 hidden"></div>
+    </div>
+
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-xl relative overflow-hidden group">
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+      
+      <div class="flex items-center gap-3 mb-2">
+        <div class="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20 text-blue-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+        <h2 class="text-xl font-bold text-white">Verify Integrity</h2>
+      </div>
+      <p class="text-sm text-zinc-400 mb-6">Upload a file to check if it has been modified since it was registered.</p>
+
+      <form id="verifyForm" enctype="multipart/form-data" class="space-y-4">
+        <label for="verifyFile" class="flex flex-col items-center justify-center w-full h-32 border-2 border-zinc-700 border-dashed rounded-xl cursor-pointer bg-black/50 hover:bg-zinc-800 hover:border-blue-500 transition-colors relative">
+          <div class="flex flex-col items-center justify-center pt-5 pb-6">
+            <svg class="w-8 h-8 mb-2 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+            <p class="text-sm text-zinc-400 font-medium"><span class="text-white">Click to browse</span> or drag and drop</p>
+          </div>
+          <input id="verifyFile" type="file" name="file" required class="hidden" onchange="document.getElementById('verFileName').textContent = this.files[0].name">
+        </label>
+        <p id="verFileName" class="text-xs text-blue-400 font-mono text-center h-4"></p>
+
+        <button class="w-full bg-white text-black py-3 rounded-lg font-bold hover:bg-zinc-200 transition-colors shadow-lg flex items-center justify-center gap-2" type="submit">
+          Verify File Status
+        </button>
+      </form>
+
+      <div id="verifyOut" class="mt-6 hidden"></div>
+    </div>
+
   </div>
-</div>
-
-<div class="grid md:grid-cols-2 gap-6">
-
-  <!-- REGISTER / STORE -->
-  <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
-    <h2 class="text-xl font-bold mb-2">Register File Hash</h2>
-    <p class="text-sm text-gray-400 mb-4">Store the file fingerprint in cloud DB.</p>
-
-    <form id="registerForm" enctype="multipart/form-data">
-      <input id="registerFile" type="file" name="file" required class="mb-4 block w-full text-sm text-gray-300">
-      <button class="bg-white text-black w-full py-2 rounded font-semibold hover:bg-gray-200" type="submit">
-        Store Hash
-      </button>
-    </form>
-
-    <div id="registerOut" class="mt-4 text-sm hidden"></div>
-  </div>
-
-  <!-- VERIFY -->
-  <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
-    <h2 class="text-xl font-bold mb-2">Verify Integrity</h2>
-    <p class="text-sm text-gray-400 mb-4">Upload again to check SAFE / TAMPERED.</p>
-
-    <form id="verifyForm" enctype="multipart/form-data">
-      <input id="verifyFile" type="file" name="file" required class="mb-4 block w-full text-sm text-gray-300">
-      <button class="bg-white text-black w-full py-2 rounded font-semibold hover:bg-gray-200" type="submit">
-        Verify File
-      </button>
-    </form>
-
-    <div id="verifyOut" class="mt-4 text-sm hidden"></div>
-  </div>
-
 </div>
 
 <script>
@@ -71,57 +99,91 @@
     return data;
   }
 
-  // Register
+  // Register Form Logic
   document.getElementById("registerForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const out = document.getElementById("registerOut");
-    out.className = "mt-4 text-sm";
+    out.className = "mt-6 p-4 rounded-xl text-sm font-medium bg-zinc-800 border border-zinc-700 text-zinc-300";
     out.classList.remove("hidden");
-    out.textContent = "Processing...";
+    out.innerHTML = `<span class="animate-pulse flex items-center gap-2"><svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing Hash...</span>`;
+    
     try {
       const data = await postFile("/api/register", "registerFile");
-      out.classList.add("text-green-400");
+      out.className = "mt-6 p-4 rounded-xl text-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-inner";
       out.innerHTML = `
-        ✅ Stored<br>
-        <span class="text-gray-300">File:</span> ${data.filename}<br>
-        <span class="text-gray-300">Size:</span> ${data.filesize} bytes<br>
-        <span class="text-gray-300">Hash:</span> <span class="break-all">${data.hash}</span>
+        <div class="flex items-center gap-2 font-bold mb-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Successfully Registered
+        </div>
+        <div class="space-y-1 font-mono text-xs text-zinc-300">
+          <p><span class="text-zinc-500">File:</span> ${data.filename}</p>
+          <p><span class="text-zinc-500">Size:</span> ${data.filesize} bytes</p>
+          <p class="break-all"><span class="text-zinc-500">Hash:</span> <span class="text-emerald-300">${data.hash}</span></p>
+        </div>
       `;
     } catch (err) {
-      out.classList.add("text-red-400");
-      out.textContent = "❌ " + err.message;
+      out.className = "mt-6 p-4 rounded-xl text-sm bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-inner";
+      out.innerHTML = `❌ ${err.message}`;
     }
   });
 
-  // Verify
+  // Verify Form Logic
   document.getElementById("verifyForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const out = document.getElementById("verifyOut");
-    out.className = "mt-4 text-sm";
+    out.className = "mt-6 p-4 rounded-xl text-sm font-medium bg-zinc-800 border border-zinc-700 text-zinc-300";
     out.classList.remove("hidden");
-    out.textContent = "Processing...";
+    out.innerHTML = `<span class="animate-pulse flex items-center gap-2"><svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Verifying Integrity...</span>`;
+    
     try {
       const data = await postFile("/api/verify", "verifyFile");
 
       if (data.status === "SAFE") {
-        out.classList.add("text-green-400");
-        out.innerHTML = `🟢 SAFE: ${data.message}<br>
-          <span class="text-gray-300">File:</span> ${data.filename}<br>
-          <span class="text-gray-300">Expected:</span> <span class="break-all">${data.expected_hash}</span><br>
-          <span class="text-gray-300">Actual:</span> <span class="break-all">${data.actual_hash}</span>`;
+        out.className = "mt-6 p-4 rounded-xl text-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-inner";
+        out.innerHTML = `
+          <div class="flex items-center gap-2 font-bold mb-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            SAFE: Integrity Verified
+          </div>
+          <p class="text-xs text-zinc-400 mb-2">${data.message}</p>
+          <div class="space-y-1 font-mono text-xs text-zinc-300 bg-black/40 p-3 rounded-lg border border-zinc-800">
+            <p><span class="text-zinc-500">File:</span> ${data.filename}</p>
+            <p class="break-all"><span class="text-zinc-500">Matched Hash:</span> <span class="text-emerald-300">${data.actual_hash}</span></p>
+          </div>
+        `;
       } else if (data.status === "TAMPERED") {
-        out.classList.add("text-red-400");
-        out.innerHTML = `🔴 TAMPERED: ${data.message}<br>
-          <span class="text-gray-300">File:</span> ${data.filename}<br>
-          <span class="text-gray-300">Expected:</span> <span class="break-all">${data.expected_hash}</span><br>
-          <span class="text-gray-300">Actual:</span> <span class="break-all">${data.actual_hash}</span>`;
+        out.className = "mt-6 p-4 rounded-xl text-sm bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-inner";
+        out.innerHTML = `
+          <div class="flex items-center gap-2 font-bold text-rose-500 mb-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            TAMPERED: Modification Detected
+          </div>
+          <p class="text-xs text-rose-400/80 mb-2">${data.message}</p>
+          <div class="space-y-2 font-mono text-xs text-zinc-300 bg-black/40 p-3 rounded-lg border border-rose-900/50">
+            <p><span class="text-zinc-500">File:</span> ${data.filename}</p>
+            <div>
+              <span class="text-zinc-500 block mb-1">Expected (Original):</span>
+              <p class="break-all text-emerald-400/70 line-through">${data.expected_hash}</p>
+            </div>
+            <div>
+              <span class="text-zinc-500 block mb-1">Actual (Modified):</span>
+              <p class="break-all text-rose-400 font-bold">${data.actual_hash}</p>
+            </div>
+          </div>
+        `;
       } else {
-        out.classList.add("text-yellow-400");
-        out.textContent = "🟡 " + data.message;
+        out.className = "mt-6 p-4 rounded-xl text-sm bg-amber-500/10 border border-amber-500/30 text-amber-400 shadow-inner";
+        out.innerHTML = `
+          <div class="flex items-center gap-2 font-bold mb-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Not Registered
+          </div>
+          <p class="text-xs text-amber-400/80">${data.message}</p>
+        `;
       }
     } catch (err) {
-      out.classList.add("text-red-400");
-      out.textContent = "❌ " + err.message;
+      out.className = "mt-6 p-4 rounded-xl text-sm bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-inner";
+      out.innerHTML = `❌ ${err.message}`;
     }
   });
 </script>
