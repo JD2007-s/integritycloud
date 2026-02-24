@@ -2,36 +2,49 @@
 {% block title %}Sign Up - IntegrityCloud{% endblock %}
 
 {% block content %}
-<div class="flex justify-center items-center h-[80vh]">
-  <form method="POST" class="bg-zinc-900/90 backdrop-blur p-8 rounded-xl w-96 border border-zinc-800">
-    <h2 class="text-2xl font-bold mb-2 text-center">Create Account</h2>
-    <p class="text-sm text-zinc-400 text-center mb-6">Start using IntegrityCloud as SaaS</p>
+<div class="flex items-center justify-center min-h-[80vh] py-8">
+  <div class="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-2xl w-full max-w-md relative overflow-hidden">
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
+
+    <div class="text-center mb-8">
+      <h2 class="text-2xl font-bold text-white">Create Account</h2>
+      <p class="text-zinc-400 text-sm mt-2">Start using IntegrityCloud as a SaaS</p>
+    </div>
 
     {% if error %}
-      <div class="bg-red-900/40 border border-red-700 text-red-200 px-4 py-2 rounded mb-4 text-sm">
-        {{ error }}
-      </div>
+    <div class="mb-6 p-4 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm font-medium flex items-center gap-3">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      {{ error }}
+    </div>
     {% endif %}
 
-    <label class="text-sm text-zinc-300">Username</label>
-    <input name="username" placeholder="Choose a username"
-           class="w-full mb-3 mt-1 p-2 text-black rounded" required>
+    <form method="POST" class="space-y-5">
+      <div>
+        <label class="block text-sm font-medium text-zinc-400 mb-1">Username</label>
+        <input name="username" placeholder="Choose a username" required
+               class="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-white transition-colors">
+      </div>
 
-    <label class="text-sm text-zinc-300">Email</label>
-    <input name="email" type="email" placeholder="you@example.com"
-           class="w-full mb-3 mt-1 p-2 text-black rounded" required>
+      <div>
+        <label class="block text-sm font-medium text-zinc-400 mb-1">Email Address</label>
+        <input name="email" type="email" placeholder="you@example.com" required
+               class="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-white transition-colors">
+      </div>
 
-    <label class="text-sm text-zinc-300">Password</label>
-    <input name="password" type="password" placeholder="Minimum 6 characters"
-           class="w-full mb-4 mt-1 p-2 text-black rounded" required>
+      <div>
+        <label class="block text-sm font-medium text-zinc-400 mb-1">Password</label>
+        <input name="password" type="password" placeholder="Minimum 6 characters" required
+               class="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-white transition-colors">
+      </div>
 
-    <button class="w-full bg-white text-black py-2 rounded font-semibold hover:bg-zinc-200">
-      Sign up
-    </button>
+      <button type="submit" class="w-full py-3 px-4 bg-white text-black font-bold rounded-lg hover:bg-zinc-200 transition-colors shadow-lg mt-2">
+        Sign up
+      </button>
+    </form>
 
-    <div class="mt-4 text-sm text-zinc-300 text-center">
-      Already have an account? <a href="/" class="hover:text-white underline">Login</a>
+    <div class="mt-6 text-center border-t border-zinc-800 pt-6 text-sm text-zinc-400">
+      Already have an account? <a href="/" class="text-emerald-400 font-medium hover:text-emerald-300 transition-colors">Login</a>
     </div>
-  </form>
+  </div>
 </div>
 {% endblock %}
