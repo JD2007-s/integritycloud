@@ -78,6 +78,10 @@ def db_cursor():
     finally:
         conn.close()
 
+@app.get("/health")
+def health():
+    return "ok", 200
+
 
 # -------------------- DATABASE INIT --------------------
 def init_db():
