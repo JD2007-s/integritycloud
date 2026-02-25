@@ -24,7 +24,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 try:
     from flask_mail import Mail, Message
     MAIL_AVAILABLE = True
-except Exception:
+except ImportError:
     MAIL_AVAILABLE = False
 
 
@@ -38,14 +38,15 @@ login_manager.init_app(app)
 
 serializer = URLSafeTimedSerializer(app.secret_key)
 
+# --- Email Configuration (Gmail SMTP) ---
 mail = Mail()
 if MAIL_AVAILABLE:
-    app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER")
-    app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", "587"))
-    app.config["MAIL_USE_TLS"] = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
-    app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME")
-    app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
-    app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER")
+    app.config["MAIL_SERVER"] = "smtp.gmail.com"
+    app.config["MAIL_PORT"] = 587
+    app.config["MAIL_USE_TLS"] = True
+    app.config["MAIL_USERNAME"] = os.environ.get("solankiparul2026@gmail.com")
+    app.config["MAIL_PASSWORD"] = os.environ.get("jqlcsqbtjunpvvjz")
+    app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("integritycloud")
     mail.init_app(app)
 
 
@@ -66,8 +67,6 @@ def db_cursor():
     if not db_url:
         raise RuntimeError("DATABASE_URL not set in Render Environment Variables.")
     
-    # FIX: Removed hardcoded sslmode="require". 
-    # Render's internal URLs don't support it, and external URLs already include it.
     conn = psycopg.connect(db_url, row_factory=dict_row)
     try:
         cur = conn.cursor()
@@ -147,14 +146,11 @@ def init_db():
             print("✅ Default admin created.")
 
 
-# FIX: Do not silently ignore initialization errors. 
-# If DB fails to create, the app must stop so you can see the error in Render Logs!
 try:
     init_db()
     print("✅ Database tables verified/created successfully.")
 except Exception as e:
     print(f"❌ CRITICAL DB INIT ERROR: {e}")
-    # Force crash so Gunicorn shows the error in logs instead of 500 error later
     sys.exit(1)
 
 
@@ -295,11 +291,22 @@ def forgot():
             token = serializer.dumps({"user_id": row["id"]})
             base = (os.environ.get("APP_BASE_URL") or request.host_url).rstrip("/")
             reset_link = f"{base}{url_for('reset_password', token=token)}"
-            
-            # Show a success alert
-            flash("✅ Reset link generated successfully!", "success")
+
+            # --- Check if Gmail SMTP is configured ---
+            if MAIL_AVAILABLE and app.config.get("MAIL_USERNAME") and app.config.get("MAIL_PASSWORD"):
+                try:
+                    msg = Message("Password Reset - IntegrityCloud", recipients=[row["email"]])
+                    msg.body = f"Hello,\n\nYou requested a password reset for IntegrityCloud.\nClick the link below to set a new password. This link is valid for 30 minutes.\n\n{reset_link}\n\nIf you did not request this, please ignore this email."
+                    mail.send(msg)
+                    reset_link = None  # Hide link from the webpage since it was emailed
+                    flash("✅ A password reset link has been emailed to you!", "success")
+                except Exception as e:
+                    print(f"Mail send failed: {e}")
+                    flash("⚠️ Email failed to send. For now, use the link below.", "error")
+            else:
+                # Fallback if Render environment variables are missing
+                flash("✅ Reset link generated below (Email not configured).", "success")
         else:
-            # Show an error alert if the email isn't in the database
             flash("❌ We couldn't find an account with that email address.", "error")
 
         return render_template(
@@ -388,6 +395,7 @@ def dashboard():
         tampers=tampers,
         user=current_user  
     )
+
 # -------------------- ADMIN --------------------
 @app.route("/admin")
 @login_required
