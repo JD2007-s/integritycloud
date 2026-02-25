@@ -44,9 +44,10 @@ if MAIL_AVAILABLE:
     app.config["MAIL_SERVER"] = "smtp.gmail.com"
     app.config["MAIL_PORT"] = 587
     app.config["MAIL_USE_TLS"] = True
-    app.config["MAIL_USERNAME"] = os.environ.get("solankiparul2026@gmail.com")
-    app.config["MAIL_PASSWORD"] = os.environ.get("jqlcsqbtjunpvvjz")
-    app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("integritycloud")
+    # FIXED: Properly configured the hardcoded fallback credentials
+    app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME", "solankiparul2026@gmail.com")
+    app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD", "jqlcsqbtjunpvvjz")
+    app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", "solankiparul2026@gmail.com")
     mail.init_app(app)
 
 
@@ -138,7 +139,8 @@ def init_db():
         if cur.fetchone()["c"] == 0:
             admin_user = os.environ.get("ADMIN_USERNAME", "admin")
             admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
-            admin_pass = os.environ.get("ADMIN_PASSWORD", "admin123")
+            admin_pass = os.environ.get("ADMIN_PASSWORD", "in
+            admin123")
             cur.execute("""
                 INSERT INTO users (username, email, password_hash, role)
                 VALUES (%s, %s, %s, 'admin')
@@ -292,7 +294,6 @@ def forgot():
             base = (os.environ.get("APP_BASE_URL") or request.host_url).rstrip("/")
             reset_link = f"{base}{url_for('reset_password', token=token)}"
 
-            # --- Check if Gmail SMTP is configured ---
             if MAIL_AVAILABLE and app.config.get("MAIL_USERNAME") and app.config.get("MAIL_PASSWORD"):
                 try:
                     msg = Message("Password Reset - IntegrityCloud", recipients=[row["email"]])
@@ -304,7 +305,6 @@ def forgot():
                     print(f"Mail send failed: {e}")
                     flash("⚠️ Email failed to send. For now, use the link below.", "error")
             else:
-                # Fallback if Render environment variables are missing
                 flash("✅ Reset link generated below (Email not configured).", "success")
         else:
             flash("❌ We couldn't find an account with that email address.", "error")
@@ -396,6 +396,54 @@ def dashboard():
         user=current_user  
     )
 
+
+# -------------------- BILLING & USAGE --------------------
+@app.route("/billing")
+@login_required
+def billing():
+    user_id = int(current_user.id)
+    
+    with db_cursor() as (conn, cur):
+        # Calculate Total Storage Used (Sum of all file sizes in bytes)
+        cur.execute("SELECT COALESCE(SUM(filesize), 0) AS total_storage FROM file_hashes WHERE user_id=%s", (user_id,))
+        storage_bytes = cur.fetchone()["total_storage"]
+        
+        # Calculate Compute/RAM usage (Total hashing operations performed)
+        cur.execute("SELECT COUNT(*) AS c FROM file_hashes WHERE user_id=%s", (user_id,))
+        hashes_count = cur.fetchone()["c"]
+        
+        cur.execute("SELECT COUNT(*) AS c FROM tamper_logs WHERE user_id=%s", (user_id,))
+        tamper_count = cur.fetchone()["c"]
+        
+    total_operations = hashes_count + tamper_count
+    
+    # Convert bytes to Megabytes (MB)
+    storage_mb = storage_bytes / (1024 * 1024)
+    
+    # --- SAAS PRICING ALGORITHM ---
+    # $5.00 Base Subscription Fee
+    # $0.15 per MB of Cloud Storage
+    # $0.05 per Compute Operation (RAM/Processing cost)
+    
+    base_fee = 5.00
+    storage_cost = storage_mb * 0.15
+    compute_cost = total_operations * 0.05
+    
+    total_bill = base_fee + storage_cost + compute_cost
+    
+    return render_template(
+        "billing.html",
+        storage_bytes=storage_bytes,
+        storage_mb=round(storage_mb, 4),
+        total_operations=total_operations,
+        storage_cost=round(storage_cost, 2),
+        compute_cost=round(compute_cost, 2),
+        base_fee=round(base_fee, 2),
+        total_bill=round(total_bill, 2)
+    )
+
+
+# -------------------- ADMIN --------------------
 # -------------------- ADMIN --------------------
 @app.route("/admin")
 @login_required
@@ -411,11 +459,17 @@ def admin_panel():
         cur.execute("SELECT COUNT(*) AS c FROM tamper_logs")
         total_tampers = cur.fetchone()["c"]
 
+        # --- UPDATED QUERY: Calculates Storage & File Count per user ---
         cur.execute("""
-            SELECT id, username, email, role, created_at
-            FROM users
-            WHERE deleted_at IS NULL
-            ORDER BY id DESC
+            SELECT 
+                u.id, u.username, u.email, u.role, u.created_at,
+                COALESCE(SUM(f.filesize), 0) AS total_storage,
+                COUNT(f.id) AS file_count
+            FROM users u
+            LEFT JOIN file_hashes f ON u.id = f.user_id
+            WHERE u.deleted_at IS NULL
+            GROUP BY u.id, u.username, u.email, u.role, u.created_at
+            ORDER BY u.id DESC
             LIMIT 200
         """)
         users = cur.fetchall()
@@ -427,58 +481,6 @@ def admin_panel():
         total_tampers=total_tampers,
         users=users
     )
-
-
-@app.route("/admin/promote/<int:user_id>", methods=["POST"])
-@login_required
-@admin_required
-def promote_user(user_id):
-    if int(current_user.id) == user_id:
-        flash("❌ You cannot modify your own role.", "error")
-        return redirect(url_for("admin_panel"))
-
-    with db_cursor() as (conn, cur):
-        cur.execute("""
-            UPDATE users SET role='admin'
-            WHERE id=%s AND deleted_at IS NULL
-        """, (user_id,))
-    flash("✅ User promoted to admin.", "success")
-    return redirect(url_for("admin_panel"))
-
-
-@app.route("/admin/demote/<int:user_id>", methods=["POST"])
-@login_required
-@admin_required
-def demote_user(user_id):
-    if int(current_user.id) == user_id:
-        flash("❌ You cannot demote yourself.", "error")
-        return redirect(url_for("admin_panel"))
-
-    with db_cursor() as (conn, cur):
-        cur.execute("""
-            UPDATE users SET role='user'
-            WHERE id=%s AND deleted_at IS NULL
-        """, (user_id,))
-    flash("✅ User set to normal user.", "success")
-    return redirect(url_for("admin_panel"))
-
-
-@app.route("/admin/delete/<int:user_id>", methods=["POST"])
-@login_required
-@admin_required
-def soft_delete_user(user_id):
-    if int(current_user.id) == user_id:
-        flash("❌ You cannot delete yourself.", "error")
-        return redirect(url_for("admin_panel"))
-
-    with db_cursor() as (conn, cur):
-        cur.execute("""
-            UPDATE users SET deleted_at=%s
-            WHERE id=%s AND deleted_at IS NULL
-        """, (utc_now(), user_id))
-    flash("✅ User soft-deleted.", "success")
-    return redirect(url_for("admin_panel"))
-
 
 # -------------------- API --------------------
 @app.route("/api/register", methods=["POST"])

@@ -49,7 +49,7 @@
     <div class="px-6 py-5 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
       <h3 class="text-lg font-bold text-white flex items-center gap-2">
         <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-        User Database
+        User Database & Usage
       </h3>
       <span class="px-3 py-1 bg-zinc-800 text-zinc-300 text-xs font-semibold rounded-full">Active Accounts</span>
     </div>
@@ -58,9 +58,10 @@
       <table class="min-w-full text-sm text-left whitespace-nowrap">
         <thead class="text-zinc-400 bg-zinc-800/30 uppercase text-xs font-semibold tracking-wider">
           <tr>
-            <th class="px-6 py-4">Username</th>
-            <th class="px-6 py-4">Email</th>
+            <th class="px-6 py-4">Username / Email</th>
             <th class="px-6 py-4">Role</th>
+            <th class="px-6 py-4">Files</th>
+            <th class="px-6 py-4">Storage Used</th>
             <th class="px-6 py-4">Created (UTC)</th>
             <th class="px-6 py-4 text-right">Actions</th>
           </tr>
@@ -68,8 +69,10 @@
         <tbody class="divide-y divide-zinc-800/50">
           {% for u in users %}
           <tr class="hover:bg-zinc-800/30 transition-colors">
-            <td class="px-6 py-4 font-medium text-white">{{ u.username }}</td>
-            <td class="px-6 py-4 text-zinc-400">{{ u.email }}</td>
+            <td class="px-6 py-4">
+              <div class="font-medium text-white">{{ u.username }}</div>
+              <div class="text-zinc-500 text-xs">{{ u.email }}</div>
+            </td>
             
             <td class="px-6 py-4">
               {% if u.role == 'admin' %}
@@ -78,8 +81,13 @@
                 <span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold text-[10px] tracking-wider uppercase rounded-md">User</span>
               {% endif %}
             </td>
+
+            <td class="px-6 py-4 font-mono text-zinc-300">{{ u.file_count }}</td>
+            <td class="px-6 py-4 font-mono text-blue-400">
+              {{ "%.2f"|format(u.total_storage / 1048576) }} MB
+            </td>
             
-            <td class="px-6 py-4 text-zinc-500">{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else u.created_at }}</td>
+            <td class="px-6 py-4 text-zinc-500">{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '' }}</td>
             
             <td class="px-6 py-4 text-right space-x-2">
               {% if u.id != current_user.id|string and u.id != current_user.id|int %}
