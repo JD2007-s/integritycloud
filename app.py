@@ -139,8 +139,7 @@ def init_db():
         if cur.fetchone()["c"] == 0:
             admin_user = os.environ.get("ADMIN_USERNAME", "admin")
             admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
-            admin_pass = os.environ.get("ADMIN_PASSWORD", "in
-            admin123")
+            admin_pass = os.environ.get("ADMIN_PASSWORD", "inadmin123")
             cur.execute("""
                 INSERT INTO users (username, email, password_hash, role)
                 VALUES (%s, %s, %s, 'admin')
