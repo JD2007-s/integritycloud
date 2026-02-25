@@ -295,26 +295,15 @@ def forgot():
             token = serializer.dumps({"user_id": row["id"]})
             base = (os.environ.get("APP_BASE_URL") or request.host_url).rstrip("/")
             reset_link = f"{base}{url_for('reset_password', token=token)}"
-
-            # Send email if configured, else show link in UI (demo)
-            if (
-                MAIL_AVAILABLE
-                and app.config.get("MAIL_SERVER")
-                and app.config.get("MAIL_USERNAME")
-                and app.config.get("MAIL_PASSWORD")
-                and app.config.get("MAIL_DEFAULT_SENDER")
-            ):
-                try:
-                    msg = Message("Password Reset - IntegrityCloud", recipients=[row["email"]])
-                    msg.body = f"Reset your password (valid 30 minutes): {reset_link}"
-                    mail.send(msg)
-                    reset_link = None
-                except Exception as e:
-                    print("Mail send failed:", e)
+            
+            # Show a success alert
+            flash("✅ Reset link generated successfully!", "success")
+        else:
+            # Show an error alert if the email isn't in the database
+            flash("❌ We couldn't find an account with that email address.", "error")
 
         return render_template(
             "forgot.html",
-            message="If the email exists, a reset link has been generated/sent.",
             reset_link=reset_link
         )
 
