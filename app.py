@@ -465,7 +465,7 @@ def admin_panel():
             formatted_users.append(user_dict)
 
     # Admin Global Platform Limit (e.g., 50 GB)
-    GLOBAL_LIMIT_MB = 51200 
+    GLOBAL_LIMIT_MB = 512
     raw_pct = (global_storage_bytes / (GLOBAL_LIMIT_MB * 1024 * 1024)) * 100
     global_storage_percentage = 1 if 0 < raw_pct < 1 else min(raw_pct, 100)
 
