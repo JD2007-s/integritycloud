@@ -2,35 +2,12 @@
 {% block title %}Dashboard - IntegrityCloud{% endblock %}
 
 {% block content %}
-<style>
-    /* New SaaS Ring Styles */
-    .storage-ring {
-        background: conic-gradient(
-            var(--ring-color, #3b82f6) calc(var(--percent, 0) * 1%),
-            #27272a calc(var(--percent, 0) * 1%) /* zinc-800 */
-        );
-    }
-    .pulse-dot {
-        animation: pulse-dot 2s ease-in-out infinite;
-    }
-    @keyframes pulse-dot {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.4; }
-    }
-</style>
-
 <div class="space-y-8 max-w-7xl mx-auto py-6">
 
   <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 border-b border-zinc-800 pb-6">
     <div>
-      <div class="flex items-center gap-3 mb-1">
-        <h2 class="text-3xl font-extrabold text-white tracking-tight">System Dashboard</h2>
-        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-            <span class="w-2 h-2 bg-emerald-400 rounded-full pulse-dot"></span>
-            <span class="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Live Server</span>
-        </div>
-      </div>
-      <p class="text-zinc-400 text-sm">File Integrity Checker — Cloud SaaS Resource Usage</p>
+      <h2 class="text-3xl font-extrabold text-white tracking-tight">Dashboard</h2>
+      <p class="text-zinc-400 text-sm mt-1">Monitor your file integrity and recent activity logs.</p>
     </div>
     <div class="flex gap-3">
       <a href="/compare" class="flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-300 font-medium hover:bg-zinc-700 hover:text-white transition-all duration-200">
@@ -44,142 +21,46 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-    <div class="bg-zinc-900 rounded-2xl shadow-xl border border-zinc-800 p-6 flex flex-col">
-        <div class="flex items-center gap-2 mb-6">
-            <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-            </svg>
-            <h2 class="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Database Storage</h2>
-        </div>
-        
-        <div class="flex items-center justify-center mb-6">
-            <div class="relative w-40 h-40 shrink-0">
-                <div class="storage-ring w-full h-full rounded-full flex items-center justify-center shadow-lg" style="--percent: {{ storage_percentage | default(0) }}; --ring-color: #3b82f6;">
-                    <div class="w-32 h-32 bg-zinc-900 rounded-full flex flex-col items-center justify-center border border-zinc-800/50">
-                        <span class="text-2xl font-black text-white">{{ storage_formatted }}</span>
-                        <span class="text-[10px] text-zinc-500 mt-1 uppercase tracking-wider">of {{ storage_limit_mb }} MB</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="mt-auto">
-            <div class="flex justify-between text-[11px] font-medium text-zinc-400 mb-2 uppercase tracking-wider">
-                <span>{{ storage_percentage }}% utilized</span>
-                <span class="text-blue-400">Secure Cluster</span>
-            </div>
-            <div class="w-full bg-zinc-800 rounded-full h-2 overflow-hidden shadow-inner">
-                <div class="h-full rounded-full bg-blue-500 transition-all duration-1000 ease-out" style="width: {{ storage_percentage | default(0) }}%"></div>
-            </div>
-        </div>
+  <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-sm mb-6">
+    <div class="flex items-baseline gap-2 mb-4">
+      <h2 class="text-4xl font-normal text-white tracking-tight">{{ storage_formatted }}</h2>
+      <span class="text-lg text-zinc-400 font-medium">of {{ storage_limit_mb }} MB used</span>
     </div>
-
-    <div class="flex flex-col gap-6">
-        <div class="bg-zinc-900 rounded-2xl shadow-xl border border-zinc-800 p-6 flex-1">
-            <div class="flex items-center gap-2 mb-5">
-                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
-                </svg>
-                <h2 class="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Compute Resources</h2>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="bg-zinc-800/40 rounded-xl p-4 border border-zinc-700/50">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs text-zinc-400 font-medium">CPU (vCores)</span>
-                        <span id="cpu-value" class="text-xs font-bold text-purple-400">0%</span>
-                    </div>
-                    <div class="w-full bg-zinc-700/50 rounded-full h-1.5 mb-2 overflow-hidden">
-                        <div id="cpu-bar" class="h-full rounded-full bg-purple-500 transition-all duration-700"></div>
-                    </div>
-                    <span class="text-[10px] text-zinc-500">2 Cores Allocated</span>
-                </div>
-                <div class="bg-zinc-800/40 rounded-xl p-4 border border-zinc-700/50">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs text-zinc-400 font-medium">RAM Memory</span>
-                        <span id="ram-value" class="text-xs font-bold text-cyan-400">0%</span>
-                    </div>
-                    <div class="w-full bg-zinc-700/50 rounded-full h-1.5 mb-2 overflow-hidden">
-                        <div id="ram-bar" class="h-full rounded-full bg-cyan-500 transition-all duration-700"></div>
-                    </div>
-                    <span class="text-[10px] text-zinc-500">4 GB Allocated</span>
-                </div>
-            </div>
-        </div>
-        <div class="bg-zinc-900 rounded-2xl shadow-xl border border-zinc-800 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-2">
-                    <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
-                    </svg>
-                    <h2 class="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Network IO</h2>
-                </div>
-                <span id="bw-percent" class="text-xs font-bold text-rose-400">0%</span>
-            </div>
-            <div class="w-full bg-zinc-800 rounded-full h-2 mb-3 overflow-hidden">
-                <div id="bw-bar" class="h-full rounded-full bg-gradient-to-r from-rose-500 to-pink-500 transition-all duration-1000" style="width: 0%;"></div>
-            </div>
-            <div class="flex justify-between text-xs text-zinc-400 font-mono">
-                <span>Upload: <span id="bw-upload" class="text-zinc-200">0 GB</span></span>
-                <span>Download: <span id="bw-download" class="text-zinc-200">0 GB</span></span>
-            </div>
-        </div>
+    
+    <div class="w-full bg-zinc-800 rounded-full h-3 overflow-hidden flex">
+      <div class="bg-blue-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: {{ storage_percentage | default(0) }}%;"></div>
     </div>
-
-    <div class="flex flex-col gap-6">
-        <div class="bg-zinc-900 rounded-2xl shadow-xl border border-zinc-800 p-6 flex-1">
-            <div class="flex items-center gap-2 mb-6">
-                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                </svg>
-                <h2 class="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Security & Usage</h2>
-            </div>
-            
-            <div class="space-y-4">
-                <div class="flex items-center justify-between p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        </div>
-                        <div>
-                            <p class="text-[11px] text-zinc-500 uppercase font-semibold tracking-wider">Secured Hashes</p>
-                            <p class="text-white font-medium text-sm">Active Monitoring</p>
-                        </div>
-                    </div>
-                    <span class="text-2xl font-black text-emerald-400">{{ hashes_count }}</span>
-                </div>
-
-                <div class="flex items-center justify-between p-3 rounded-xl {% if tamper_count > 0 %}bg-rose-500/10 border border-rose-500/20{% else %}bg-zinc-800/40 border border-zinc-700/50{% endif %}">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg {% if tamper_count > 0 %}bg-rose-500/20{% else %}bg-zinc-700{% endif %} flex items-center justify-center">
-                            <svg class="w-4 h-4 {% if tamper_count > 0 %}text-rose-400{% else %}text-zinc-400{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                        </div>
-                        <div>
-                            <p class="text-[11px] text-zinc-500 uppercase font-semibold tracking-wider">Tamper Alerts</p>
-                            <p class="text-white font-medium text-sm">Integrity Breaches</p>
-                        </div>
-                    </div>
-                    <span class="text-2xl font-black {% if tamper_count > 0 %}text-rose-400{% else %}text-zinc-300{% endif %}">{{ tamper_count }}</span>
-                </div>
-
-                <div class="flex items-center justify-between p-3 rounded-xl bg-zinc-800/40 border border-zinc-700/50">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-bold">
-                            {{ current_user.username[0]|upper }}
-                        </div>
-                        <div>
-                            <p class="text-[11px] text-zinc-500 uppercase font-semibold tracking-wider">Current Session</p>
-                            <p class="text-white font-medium text-sm truncate max-w-[120px]">{{ current_user.username }}</p>
-                        </div>
-                    </div>
-                    <span class="text-xs font-mono text-indigo-400 px-2 py-1 bg-indigo-500/10 rounded">Active</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
   </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-zinc-600 transition-colors">
+      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        <svg class="w-16 h-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>
+      </div>
+      <p class="text-zinc-400 text-sm font-medium">Active Account</p>
+      <p class="text-xl font-bold text-white mt-2">{{ current_user.username }}</p>
+      <p class="text-zinc-500 text-sm mt-1">{{ current_user.email }}</p>
+    </div>
+
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-emerald-500/50 transition-colors">
+      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        <svg class="w-16 h-16 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path></svg>
+      </div>
+      <p class="text-zinc-400 text-sm font-medium">Secured Hashes</p>
+      <p class="text-4xl font-extrabold text-emerald-400 mt-2">{{ hashes_count }}</p>
+      <p class="text-zinc-500 text-sm mt-1">Total protected files</p>
+    </div>
+
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-rose-500/50 transition-colors">
+      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        <svg class="w-16 h-16 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+      </div>
+      <p class="text-zinc-400 text-sm font-medium">Tamper Alerts</p>
+      <p class="text-4xl font-extrabold {% if tamper_count > 0 %}text-rose-500{% else %}text-white{% endif %} mt-2">{{ tamper_count }}</p>
+      <p class="text-zinc-500 text-sm mt-1">Integrity mismatch events</p>
+    </div>
+  </div>
+
   <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg mt-8">
     <div class="px-6 py-5 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
       <h3 class="text-lg font-bold text-white flex items-center gap-2">
@@ -214,56 +95,7 @@
           {% else %}
             <tr>
               <td colspan="4" class="px-6 py-12 text-center">
-                <svg class="mx-auto h-12 w-12 text-zinc-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 <p class="text-zinc-400 font-medium text-lg">No file hashes stored yet.</p>
-                <p class="text-zinc-500 mt-1">Head over to the home page to register your first file.</p>
-              </td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg mt-8">
-    <div class="px-6 py-5 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
-      <h3 class="text-lg font-bold text-white flex items-center gap-2">
-        <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-        Security & Tamper Alerts
-      </h3>
-      <span class="px-3 py-1 bg-zinc-800 text-zinc-300 text-xs font-semibold rounded-full">Last 20</span>
-    </div>
-
-    <div class="overflow-x-auto">
-      <table class="min-w-full text-sm text-left whitespace-nowrap">
-        <thead class="text-zinc-400 bg-zinc-800/30 uppercase text-xs font-semibold tracking-wider">
-          <tr>
-            <th class="px-6 py-4">Filename</th>
-            <th class="px-6 py-4">Expected Hash</th>
-            <th class="px-6 py-4">Actual Hash (Tampered)</th>
-            <th class="px-6 py-4 text-right">Timestamp (UTC)</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-zinc-800/50">
-          {% if tampers and tampers|length > 0 %}
-            {% for t in tampers %}
-              <tr class="hover:bg-zinc-800/30 transition-colors bg-rose-500/5">
-                <td class="px-6 py-4 font-medium text-zinc-200">{{ t.filename }}</td>
-                <td class="px-6 py-4">
-                  <span class="px-2 py-1 bg-zinc-800 text-emerald-400 font-mono text-xs rounded-md">{{ t.expected_sha256[:12] }}...</span>
-                </td>
-                <td class="px-6 py-4">
-                  <span class="px-2 py-1 bg-rose-500/20 text-rose-400 font-mono text-xs rounded-md border border-rose-500/30">{{ t.actual_sha256[:12] }}...</span>
-                </td>
-                <td class="px-6 py-4 text-zinc-500 text-right">{{ t.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-              </tr>
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="4" class="px-6 py-12 text-center">
-                <svg class="mx-auto h-12 w-12 text-zinc-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-                <p class="text-zinc-400 font-medium text-lg">No security alerts.</p>
-                <p class="text-emerald-500/80 mt-1">All verified files match their original integrity. That’s a great sign!</p>
               </td>
             </tr>
           {% endif %}
@@ -273,46 +105,4 @@
   </div>
 
 </div>
-
-<script>
-    function animateCounter(elId, target, suffix = '') {
-        const el = document.getElementById(elId);
-        if (!el) return;
-        let start = 0;
-        const duration = 1500;
-        const startTime = performance.now();
-        function step(now) {
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3); // Ease out cubic
-            const current = start + (target - start) * eased;
-            el.textContent = Math.round(current) + suffix;
-            if (progress < 1) requestAnimationFrame(step);
-        }
-        requestAnimationFrame(step);
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        // Simulated Cloud Metrics for visual flair
-        setTimeout(() => {
-            // CPU
-            const cpuPercent = Math.floor(Math.random() * 20) + 15; // 15-35%
-            document.getElementById('cpu-bar').style.width = cpuPercent + '%';
-            animateCounter('cpu-value', cpuPercent, '%');
-
-            // RAM
-            const ramPercent = Math.floor(Math.random() * 30) + 40; // 40-70%
-            document.getElementById('ram-bar').style.width = ramPercent + '%';
-            animateCounter('ram-value', ramPercent, '%');
-
-            // Bandwidth
-            const bwPercent = Math.floor(Math.random() * 15) + 5; // 5-20%
-            document.getElementById('bw-bar').style.width = bwPercent + '%';
-            animateCounter('bw-percent', bwPercent, '%');
-            
-            animateCounter('bw-upload', 2, ' GB');
-            animateCounter('bw-download', 4, ' GB');
-        }, 300);
-    });
-</script>
 {% endblock %}

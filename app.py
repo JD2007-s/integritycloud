@@ -79,6 +79,16 @@ def db_cursor():
     finally:
         conn.close()
 
+def format_bytes(size):
+    if not size:
+        return "0 Bytes"
+    if size < 1024:
+        return f"{size} Bytes"
+    elif size < 1048576:
+        return f"{size / 1024:.2f} KB"
+    else:
+        return f"{size / 1048576:.2f} MB"
+
 @app.get("/health")
 def health():
     return "👍", 200
@@ -357,11 +367,14 @@ def compare_page():
     return render_template("compare.html")
 
 
+
 # -------------------- DASHBOARD --------------------
 @app.route("/dashboard")
 @login_required
 def dashboard():
     user_id = int(current_user.id)
+    STORAGE_LIMIT_MB = 512
+    storage_limit_bytes = STORAGE_LIMIT_MB * 1024 * 1024
 
     with db_cursor() as (conn, cur):
         cur.execute("SELECT COUNT(*) AS c FROM file_hashes WHERE user_id=%s", (user_id,))
@@ -369,6 +382,9 @@ def dashboard():
 
         cur.execute("SELECT COUNT(*) AS c FROM tamper_logs WHERE user_id=%s", (user_id,))
         tamper_count = cur.fetchone()["c"]
+
+        cur.execute("SELECT COALESCE(SUM(filesize), 0) AS total_storage FROM file_hashes WHERE user_id=%s", (user_id,))
+        storage_bytes = cur.fetchone()["total_storage"]
 
         cur.execute("""
             SELECT filename, filesize, sha256, created_at
@@ -386,63 +402,21 @@ def dashboard():
         """, (user_id,))
         tampers = cur.fetchall()
 
+    raw_percentage = (storage_bytes / storage_limit_bytes) * 100 if storage_limit_bytes > 0 else 0
+    storage_percentage = 1 if 0 < raw_percentage < 1 else min(raw_percentage, 100)
+
     return render_template(
         "dashboard.html",
         hashes_count=hashes_count,
         tamper_count=tamper_count,
         hashes=hashes,
         tampers=tampers,
-        user=current_user  
+        user=current_user,
+        storage_formatted=format_bytes(storage_bytes),
+        storage_limit_mb=STORAGE_LIMIT_MB,
+        storage_percentage=round(storage_percentage, 1)
     )
 
-
-# -------------------- BILLING & USAGE --------------------
-@app.route("/billing")
-@login_required
-def billing():
-    user_id = int(current_user.id)
-    
-    with db_cursor() as (conn, cur):
-        # Calculate Total Storage Used (Sum of all file sizes in bytes)
-        cur.execute("SELECT COALESCE(SUM(filesize), 0) AS total_storage FROM file_hashes WHERE user_id=%s", (user_id,))
-        storage_bytes = cur.fetchone()["total_storage"]
-        
-        # Calculate Compute/RAM usage (Total hashing operations performed)
-        cur.execute("SELECT COUNT(*) AS c FROM file_hashes WHERE user_id=%s", (user_id,))
-        hashes_count = cur.fetchone()["c"]
-        
-        cur.execute("SELECT COUNT(*) AS c FROM tamper_logs WHERE user_id=%s", (user_id,))
-        tamper_count = cur.fetchone()["c"]
-        
-    total_operations = hashes_count + tamper_count
-    
-    # Convert bytes to Megabytes (MB)
-    storage_mb = storage_bytes / (1024 * 1024)
-    
-    # --- SAAS PRICING ALGORITHM ---
-    # $5.00 Base Subscription Fee
-    # $0.15 per MB of Cloud Storage
-    # $0.05 per Compute Operation (RAM/Processing cost)
-    
-    base_fee = 5.00
-    storage_cost = storage_mb * 0.15
-    compute_cost = total_operations * 0.05
-    
-    total_bill = base_fee + storage_cost + compute_cost
-    
-    return render_template(
-        "billing.html",
-        storage_bytes=storage_bytes,
-        storage_mb=round(storage_mb, 4),
-        total_operations=total_operations,
-        storage_cost=round(storage_cost, 2),
-        compute_cost=round(compute_cost, 2),
-        base_fee=round(base_fee, 2),
-        total_bill=round(total_bill, 2)
-    )
-
-
-# -------------------- ADMIN --------------------
 # -------------------- ADMIN --------------------
 @app.route("/admin")
 @login_required
@@ -457,8 +431,11 @@ def admin_panel():
 
         cur.execute("SELECT COUNT(*) AS c FROM tamper_logs")
         total_tampers = cur.fetchone()["c"]
+        
+        # Get Global Storage for the Admin Ring
+        cur.execute("SELECT COALESCE(SUM(filesize), 0) AS c FROM file_hashes")
+        global_storage_bytes = cur.fetchone()["c"]
 
-        # --- UPDATED QUERY: Calculates Storage & File Count per user ---
         cur.execute("""
             SELECT 
                 u.id, u.username, u.email, u.role, u.created_at,
@@ -471,137 +448,36 @@ def admin_panel():
             ORDER BY u.id DESC
             LIMIT 200
         """)
-        users = cur.fetchall()
+        users_raw = cur.fetchall()
+        
+        formatted_users = []
+        for u in users_raw:
+            user_dict = dict(u)
+            # Smart format showing Bytes, KB, or MB
+            user_dict["formatted_storage"] = format_bytes(user_dict["total_storage"])
+            
+            # --- SaaS Billing Calculation ---
+            # $5.00 Base + $0.15 per MB + $0.05 per File Hash
+            storage_mb = user_dict["total_storage"] / (1024 * 1024)
+            bill = 5.00 + (storage_mb * 0.15) + (user_dict["file_count"] * 0.05)
+            user_dict["bill"] = f"${bill:.2f}"
+            
+            formatted_users.append(user_dict)
+
+    # Admin Global Platform Limit (e.g., 50 GB)
+    GLOBAL_LIMIT_MB = 51200 
+    raw_pct = (global_storage_bytes / (GLOBAL_LIMIT_MB * 1024 * 1024)) * 100
+    global_storage_percentage = 1 if 0 < raw_pct < 1 else min(raw_pct, 100)
 
     return render_template(
         "admin.html",
         total_users=total_users,
         total_hashes=total_hashes,
         total_tampers=total_tampers,
-        users=users
+        users=formatted_users,
+        global_storage_formatted=format_bytes(global_storage_bytes),
+        global_storage_percentage=round(global_storage_percentage, 1),
+        global_limit_mb=GLOBAL_LIMIT_MB
     )
-
-# -------------------- API --------------------
-@app.route("/api/register", methods=["POST"])
-@login_required
-def api_register():
-    if "file" not in request.files:
-        return jsonify({"error": "No file provided"}), 400
-
-    f = request.files["file"]
-    data = f.read()
-    if not data:
-        return jsonify({"error": "Uploaded file is empty"}), 400
-
-    file_hash = sha256_bytes(data)
-    filesize = len(data)
-    filename = f.filename or "unknown"
-    now = utc_now()
-
-    with db_cursor() as (conn, cur):
-        cur.execute("""
-            INSERT INTO file_hashes (user_id, username, filename, filesize, sha256, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (int(current_user.id), current_user.username, filename, filesize, file_hash, now))
-
-    return jsonify({
-        "message": "Hash stored successfully",
-        "filename": filename,
-        "filesize": filesize,
-        "hash": file_hash,
-        "created_at": now.isoformat()
-    })
-
-
-@app.route("/api/verify", methods=["POST"])
-@login_required
-def api_verify():
-    if "file" not in request.files:
-        return jsonify({"error": "No file provided"}), 400
-
-    f = request.files["file"]
-    data = f.read()
-    if not data:
-        return jsonify({"error": "Uploaded file is empty"}), 400
-
-    actual_hash = sha256_bytes(data)
-    filesize = len(data)
-    filename = f.filename or "unknown"
-
-    with db_cursor() as (conn, cur):
-        cur.execute("""
-            SELECT sha256, created_at
-            FROM file_hashes
-            WHERE user_id=%s AND filename=%s
-            ORDER BY id DESC LIMIT 1
-        """, (int(current_user.id), filename))
-        row = cur.fetchone()
-
-        if not row:
-            return jsonify({
-                "status": "NOT_REGISTERED",
-                "message": "No stored hash found for this filename. Store hash first.",
-                "filename": filename,
-                "filesize": filesize,
-                "actual_hash": actual_hash
-            })
-
-        expected_hash = row["sha256"]
-        stored_time = row["created_at"]
-
-        if expected_hash == actual_hash:
-            return jsonify({
-                "status": "SAFE",
-                "message": "File integrity verified. No changes detected.",
-                "filename": filename,
-                "filesize": filesize,
-                "stored_at": stored_time.isoformat() if stored_time else None,
-                "expected_hash": expected_hash,
-                "actual_hash": actual_hash
-            })
-
-        # Tampered -> log
-        now = utc_now()
-        cur.execute("""
-            INSERT INTO tamper_logs (user_id, username, filename, expected_sha256, actual_sha256, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (int(current_user.id), current_user.username, filename, expected_hash, actual_hash, now))
-
-        return jsonify({
-            "status": "TAMPERED",
-            "message": "ALERT: File has been modified (hash mismatch).",
-            "filename": filename,
-            "filesize": filesize,
-            "stored_at": stored_time.isoformat() if stored_time else None,
-            "expected_hash": expected_hash,
-            "actual_hash": actual_hash,
-            "logged_at": now.isoformat()
-        })
-
-
-@app.route("/api/compare", methods=["POST"])
-@login_required
-def api_compare():
-    if "file1" not in request.files or "file2" not in request.files:
-        return jsonify({"error": "Both files are required"}), 400
-
-    f1 = request.files["file1"]
-    f2 = request.files["file2"]
-    d1 = f1.read()
-    d2 = f2.read()
-
-    if not d1 or not d2:
-        return jsonify({"error": "One of the uploaded files is empty"}), 400
-
-    h1 = sha256_bytes(d1)
-    h2 = sha256_bytes(d2)
-
-    return jsonify({
-        "file1": {"name": f1.filename or "file1", "size": len(d1), "hash": h1},
-        "file2": {"name": f2.filename or "file2", "size": len(d2), "hash": h2},
-        "result": "MATCH" if h1 == h2 else "MISMATCH"
-    })
-
-
 if __name__ == "__main__":
     app.run(debug=True)

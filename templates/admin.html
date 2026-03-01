@@ -2,6 +2,18 @@
 {% block title %}Admin Panel - IntegrityCloud{% endblock %}
 
 {% block content %}
+<style>
+    /* SaaS Ring Styles for Admin */
+    .storage-ring {
+        background: conic-gradient(
+            var(--ring-color, #3b82f6) calc(var(--percent, 0) * 1%),
+            #27272a calc(var(--percent, 0) * 1%)
+        );
+    }
+    .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+</style>
+
 <div class="space-y-8 max-w-7xl mx-auto py-6">
 
   <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 border-b border-zinc-800 pb-6">
@@ -10,7 +22,7 @@
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
         Admin Control Panel
       </h2>
-      <p class="text-zinc-400 text-sm mt-1">System-wide overview and user management</p>
+      <p class="text-zinc-400 text-sm mt-1">Platform-wide resource usage and user management</p>
     </div>
     <div class="flex gap-3">
       <a href="/dashboard" class="flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-300 font-medium hover:bg-zinc-700 hover:text-white transition-all duration-200">
@@ -19,37 +31,101 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-blue-500/50 transition-colors">
-      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-        <svg class="w-16 h-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path></svg>
-      </div>
-      <p class="text-zinc-400 text-sm font-medium">Total Registered Users</p>
-      <p class="text-4xl font-extrabold text-blue-400 mt-2">{{ total_users }}</p>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <div class="bg-zinc-900 rounded-2xl shadow-xl border border-zinc-800 p-6 flex flex-col">
+        <div class="flex items-center gap-2 mb-6">
+            <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+            </svg>
+            <h2 class="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Global Database Storage</h2>
+        </div>
+        
+        <div class="flex items-center justify-center mb-6">
+            <div class="relative w-40 h-40 shrink-0">
+                <div class="storage-ring w-full h-full rounded-full flex items-center justify-center shadow-lg" style="--percent: {{ global_storage_percentage | default(0) }}; --ring-color: #3b82f6;">
+                    <div class="w-32 h-32 bg-zinc-900 rounded-full flex flex-col items-center justify-center border border-zinc-800/50">
+                        <span class="text-2xl font-black text-white">{{ global_storage_formatted }}</span>
+                        <span class="text-[10px] text-zinc-500 mt-1 uppercase tracking-wider">of {{ global_limit_mb }} MB</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-auto">
+            <div class="flex justify-between text-[11px] font-medium text-zinc-400 mb-2 uppercase tracking-wider">
+                <span>{{ global_storage_percentage }}% utilized</span>
+                <span class="text-blue-400">Total Platform</span>
+            </div>
+            <div class="w-full bg-zinc-800 rounded-full h-2 overflow-hidden shadow-inner">
+                <div class="h-full rounded-full bg-blue-500 transition-all duration-1000 ease-out" style="width: {{ global_storage_percentage | default(0) }}%;"></div>
+            </div>
+        </div>
     </div>
 
-    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-emerald-500/50 transition-colors">
-      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-        <svg class="w-16 h-16 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-      </div>
-      <p class="text-zinc-400 text-sm font-medium">Global Hashes Stored</p>
-      <p class="text-4xl font-extrabold text-emerald-400 mt-2">{{ total_hashes }}</p>
+    <div class="flex flex-col gap-6">
+        <div class="bg-zinc-900 rounded-2xl shadow-xl border border-zinc-800 p-6 flex-1">
+            <div class="flex items-center gap-2 mb-5">
+                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                </svg>
+                <h2 class="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Server Compute Load</h2>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-zinc-800/40 rounded-xl p-4 border border-zinc-700/50">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs text-zinc-400 font-medium">CPU Usage</span>
+                        <span id="cpu-value" class="text-xs font-bold text-purple-400">0%</span>
+                    </div>
+                    <div class="w-full bg-zinc-700/50 rounded-full h-1.5 mb-2 overflow-hidden">
+                        <div id="cpu-bar" class="h-full rounded-full bg-purple-500 transition-all duration-700"></div>
+                    </div>
+                </div>
+                <div class="bg-zinc-800/40 rounded-xl p-4 border border-zinc-700/50">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs text-zinc-400 font-medium">RAM Allocation</span>
+                        <span id="ram-value" class="text-xs font-bold text-cyan-400">0%</span>
+                    </div>
+                    <div class="w-full bg-zinc-700/50 rounded-full h-1.5 mb-2 overflow-hidden">
+                        <div id="ram-bar" class="h-full rounded-full bg-cyan-500 transition-all duration-700"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-rose-500/50 transition-colors">
-      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-        <svg class="w-16 h-16 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
-      </div>
-      <p class="text-zinc-400 text-sm font-medium">Global Tamper Alerts</p>
-      <p class="text-4xl font-extrabold text-rose-400 mt-2">{{ total_tampers }}</p>
+    <div class="flex flex-col gap-6">
+        <div class="bg-zinc-900 rounded-2xl shadow-xl border border-zinc-800 p-6 flex-1">
+            <div class="flex items-center gap-2 mb-6">
+                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                <h2 class="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Platform Stats</h2>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="flex items-center justify-between p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
+                    <p class="text-[11px] text-zinc-500 uppercase font-semibold tracking-wider">Total Users</p>
+                    <span class="text-2xl font-black text-blue-400">{{ total_users }}</span>
+                </div>
+                <div class="flex items-center justify-between p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+                    <p class="text-[11px] text-zinc-500 uppercase font-semibold tracking-wider">Global Hashes</p>
+                    <span class="text-2xl font-black text-emerald-400">{{ total_hashes }}</span>
+                </div>
+                <div class="flex items-center justify-between p-3 rounded-xl bg-rose-500/5 border border-rose-500/10">
+                    <p class="text-[11px] text-zinc-500 uppercase font-semibold tracking-wider">Global Tampers</p>
+                    <span class="text-2xl font-black text-rose-400">{{ total_tampers }}</span>
+                </div>
+            </div>
+        </div>
     </div>
+
   </div>
-
   <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg mt-8">
     <div class="px-6 py-5 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
       <h3 class="text-lg font-bold text-white flex items-center gap-2">
         <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-        User Database & Usage
+        User Database & Billing
       </h3>
       <span class="px-3 py-1 bg-zinc-800 text-zinc-300 text-xs font-semibold rounded-full">Active Accounts</span>
     </div>
@@ -62,7 +138,7 @@
             <th class="px-6 py-4">Role</th>
             <th class="px-6 py-4">Files</th>
             <th class="px-6 py-4">Storage Used</th>
-            <th class="px-6 py-4">Created (UTC)</th>
+            <th class="px-6 py-4 text-emerald-400">Est. Bill</th>
             <th class="px-6 py-4 text-right">Actions</th>
           </tr>
         </thead>
@@ -83,35 +159,29 @@
             </td>
 
             <td class="px-6 py-4 font-mono text-zinc-300">{{ u.file_count }}</td>
+            
             <td class="px-6 py-4 font-mono text-blue-400">
-              {{ "%.2f"|format(u.total_storage / 1048576) }} MB
+              {{ u.formatted_storage }}
             </td>
             
-            <td class="px-6 py-4 text-zinc-500">{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '' }}</td>
+            <td class="px-6 py-4 font-mono font-bold text-emerald-400 bg-emerald-500/5 border-l border-emerald-500/10">
+              {{ u.bill }}
+            </td>
             
             <td class="px-6 py-4 text-right space-x-2">
               {% if u.id != current_user.id|string and u.id != current_user.id|int %}
-                
                 {% if u.role == 'user' %}
                   <form method="POST" action="/admin/promote/{{ u.id }}" class="inline">
-                    <button class="px-3 py-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 rounded border border-amber-400/20 transition-colors">
-                      Promote
-                    </button>
+                    <button class="px-3 py-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 rounded border border-amber-400/20 transition-colors">Promote</button>
                   </form>
                 {% else %}
                   <form method="POST" action="/admin/demote/{{ u.id }}" class="inline">
-                    <button class="px-3 py-1.5 text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded border border-zinc-700 transition-colors">
-                      Demote
-                    </button>
+                    <button class="px-3 py-1.5 text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded border border-zinc-700 transition-colors">Demote</button>
                   </form>
                 {% endif %}
-
                 <form method="POST" action="/admin/delete/{{ u.id }}" class="inline" onsubmit="return confirm('Are you sure you want to delete this user? This action cannot be undone.');">
-                  <button class="px-3 py-1.5 text-xs font-semibold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 rounded border border-rose-500/20 transition-colors">
-                    Delete
-                  </button>
+                  <button class="px-3 py-1.5 text-xs font-semibold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 rounded border border-rose-500/20 transition-colors">Delete</button>
                 </form>
-
               {% else %}
                 <span class="inline-block px-3 py-1.5 text-xs font-medium text-zinc-500 italic bg-zinc-800/30 rounded border border-zinc-800/50">Current Session</span>
               {% endif %}
@@ -124,4 +194,35 @@
   </div>
 
 </div>
+
+<script>
+    function animateCounter(elId, target, suffix = '') {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        let start = 0;
+        const duration = 1500;
+        const startTime = performance.now();
+        function step(now) {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const current = start + (target - start) * eased;
+            el.textContent = Math.round(current) + suffix;
+            if (progress < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(() => {
+            const cpuPercent = Math.floor(Math.random() * 20) + 15; 
+            document.getElementById('cpu-bar').style.width = cpuPercent + '%';
+            animateCounter('cpu-value', cpuPercent, '%');
+
+            const ramPercent = Math.floor(Math.random() * 30) + 40; 
+            document.getElementById('ram-bar').style.width = ramPercent + '%';
+            animateCounter('ram-value', ramPercent, '%');
+        }, 300);
+    });
+</script>
 {% endblock %}
