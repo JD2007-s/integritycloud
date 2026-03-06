@@ -148,8 +148,8 @@ def init_db():
         cur.execute("SELECT COUNT(*) AS c FROM users")
         if cur.fetchone()["c"] == 0:
             admin_user = os.environ.get("ADMIN_USERNAME", "admin")
-            admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
-            admin_pass = os.environ.get("ADMIN_PASSWORD", "inadmin123")
+            admin_email = os.environ.get("ADMIN_EMAIL", "admin_fic@gmail.com")
+            admin_pass = os.environ.get("ADMIN_PASSWORD", "adminfic2026")
             cur.execute("""
                 INSERT INTO users (username, email, password_hash, role)
                 VALUES (%s, %s, %s, 'admin')
@@ -480,4 +480,4 @@ def admin_panel():
         global_limit_mb=GLOBAL_LIMIT_MB
     )
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True) 
