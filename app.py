@@ -371,7 +371,10 @@ def register_file():
                 
             return jsonify({
                 "status": "success", 
-                "message": f"File '{filename}' fingerprint securely registered."
+                "message": f"File '{filename}' successfully saved to Supabase Cloud and registered.",
+                "filename": filename,
+                "filesize": filesize,
+                "hash": file_hash
             }), 200
         except Exception as e:
             return jsonify({"status": "error", "message": "Database error occurred."}), 500
