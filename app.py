@@ -353,56 +353,52 @@ def compare_page():
 def register_file():
     uploaded_file = request.files.get("file")
     
-    if uploaded_file and uploaded_file.filename:
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify({"status": "error", "message": "No file selected."}), 400
+
+    try:
         filename = secure_filename(uploaded_file.filename)
         
-        # 1. Read to calculate hash
-        file_bytes = uploaded_file.read() 
-        file_hash = sha256_bytes(file_bytes) 
+        # 1. Read file into memory to calculate hash
+        file_bytes = uploaded_file.read()
+        file_hash = sha256_bytes(file_bytes)
         filesize = len(file_bytes)
         
-        # --- CRITICAL FIX: Rewind the file pointer for the upload ---
-        uploaded_file.seek(0)
+        # 2. AUTOMATIC SUPABASE UPLOAD
+        # This part runs every single time you click the button
+        endpoint = f"{SUPABASE_URL}/storage/v1/object/integrity-files/{filename}"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": uploaded_file.content_type,
+            "x-upsert": "true" # Overwrites if file exists
+        }
         
-        try:
-            # 2. DIRECT UPLOAD TO SUPABASE
-            if SUPABASE_URL and SUPABASE_KEY:
-                endpoint = f"{SUPABASE_URL}/storage/v1/object/integrity-files/{filename}"
-                headers = {
-                    "apikey": SUPABASE_KEY,
-                    "Authorization": f"Bearer {SUPABASE_KEY}",
-                    "x-upsert": "true"
-                }
-                
-                # We send 'file_bytes' directly since we already have them in memory
-                response = requests.post(endpoint, headers=headers, data=file_bytes)
-                
-                # Check if Supabase actually accepted it
-                if response.status_code != 200:
-                    print(f"SUPABASE UPLOAD FAILED: {response.text}")
-                    # We continue to DB anyway so the UI doesn't hang, 
-                    # but the log will tell us the truth now.
+        # We send the bytes directly to Supabase
+        cloud_response = requests.post(endpoint, headers=headers, data=file_bytes)
+        
+        if cloud_response.status_code not in [200, 201]:
+            print(f"Cloud Storage Error: {cloud_response.text}")
+            return jsonify({"status": "error", "message": "Cloud storage failed. Try again."}), 500
 
-            # 3. Save the Metadata to PostgreSQL
-            with db_cursor() as (conn, cur):
-                cur.execute("""
-                    INSERT INTO file_hashes (user_id, username, filename, filesize, sha256, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (current_user.id, current_user.username, filename, filesize, file_hash, utc_now()))
-                
-            return jsonify({
-                "status": "success", 
-                "message": f"File '{filename}' registered!",
-                "filename": filename,
-                "filesize": filesize,
-                "hash": file_hash
-            }), 200
+        # 3. Save to Database (Only if cloud upload worked)
+        with db_cursor() as (conn, cur):
+            cur.execute("""
+                INSERT INTO file_hashes (user_id, username, filename, filesize, sha256, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (current_user.id, current_user.username, filename, filesize, file_hash, utc_now()))
             
-        except Exception as e:
-            print(f"Detailed Error: {e}")
-            return jsonify({"status": "error", "message": "Server error."}), 500
-            
-    return jsonify({"status": "error", "message": "No file selected."}), 400
+        return jsonify({
+            "status": "success", 
+            "message": "File secured in Supabase and Database!",
+            "filename": filename,
+            "filesize": filesize,
+            "hash": file_hash
+        }), 200
+        
+    except Exception as e:
+        print(f"System Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/verify_file", methods=["POST"])
 @login_required
