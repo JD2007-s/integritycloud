@@ -8,7 +8,7 @@ import sys
 from datetime import datetime, timezone
 from functools import wraps
 from contextlib import contextmanager
-
+import requests
 import psycopg
 from psycopg.rows import dict_row
 
@@ -36,8 +36,11 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")  # MUST set SECRET_K
 login_manager = LoginManager()
 login_manager.login_view = "login"
 login_manager.init_app(app)
+# --- SUPABASE CONFIGURATION ---
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-serializer = URLSafeTimedSerializer(app.secret_key)
+
 
 # --- Email Configuration (Gmail SMTP) ---
 mail = Mail()
