@@ -1,1 +1,1 @@
-superbase
+supabase
