@@ -18,6 +18,7 @@ from flask_login import (
 )
 
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 # Optional email (only if env vars configured)
@@ -44,7 +45,6 @@ if MAIL_AVAILABLE:
     app.config["MAIL_SERVER"] = "smtp.gmail.com"
     app.config["MAIL_PORT"] = 587
     app.config["MAIL_USE_TLS"] = True
-    # FIXED: Properly configured the hardcoded fallback credentials
     app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME", "solankiparul2026@gmail.com")
     app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD", "jqlcsqbtjunpvvjz")
     app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", "solankiparul2026@gmail.com")
@@ -59,7 +59,6 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 def get_database_url():
-    # Render provides DATABASE_URL for Postgres
     return os.environ.get("DATABASE_URL")
 
 @contextmanager
@@ -97,7 +96,6 @@ def health():
 # -------------------- DATABASE INIT --------------------
 def init_db():
     with db_cursor() as (conn, cur):
-        # Users (soft delete via deleted_at)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -110,7 +108,6 @@ def init_db():
         )
         """)
 
-        # File hashes
         cur.execute("""
         CREATE TABLE IF NOT EXISTS file_hashes (
             id SERIAL PRIMARY KEY,
@@ -125,7 +122,6 @@ def init_db():
         )
         """)
 
-        # Tamper logs
         cur.execute("""
         CREATE TABLE IF NOT EXISTS tamper_logs (
             id SERIAL PRIMARY KEY,
@@ -144,7 +140,6 @@ def init_db():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_file_hashes_user_id ON file_hashes(user_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tamper_logs_user_id ON tamper_logs(user_id)")
 
-        # Create default admin if no users
         cur.execute("SELECT COUNT(*) AS c FROM users")
         if cur.fetchone()["c"] == 0:
             admin_user = os.environ.get("ADMIN_USERNAME", "admin")
@@ -155,7 +150,6 @@ def init_db():
                 VALUES (%s, %s, %s, 'admin')
             """, (admin_user, admin_email, generate_password_hash(admin_pass)))
             print("✅ Default admin created.")
-
 
 try:
     init_db()
@@ -181,7 +175,6 @@ class User(UserMixin):
     def get_id(self):
         return str(self.id)
 
-
 @login_manager.user_loader
 def load_user(user_id):
     with db_cursor() as (conn, cur):
@@ -194,7 +187,6 @@ def load_user(user_id):
         if not row:
             return None
         return User(row["id"], row["username"], row["email"], row["password_hash"], row["role"])
-
 
 def admin_required(fn):
     @wraps(fn)
@@ -235,7 +227,6 @@ def login():
 
     return render_template("login.html")
 
-
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if current_user.is_authenticated:
@@ -273,7 +264,6 @@ def signup():
 
     return render_template("signup.html")
 
-
 @app.route("/logout")
 @login_required
 def logout():
@@ -289,12 +279,7 @@ def forgot():
         email = (request.form.get("email") or "").strip().lower()
 
         with db_cursor() as (conn, cur):
-            cur.execute("""
-                SELECT id, email
-                FROM users
-                WHERE deleted_at IS NULL AND lower(email)=%s
-                LIMIT 1
-            """, (email,))
+            cur.execute("SELECT id, email FROM users WHERE deleted_at IS NULL AND lower(email)=%s LIMIT 1", (email,))
             row = cur.fetchone()
 
         reset_link = None
@@ -306,34 +291,30 @@ def forgot():
             if MAIL_AVAILABLE and app.config.get("MAIL_USERNAME") and app.config.get("MAIL_PASSWORD"):
                 try:
                     msg = Message("Password Reset - IntegrityCloud", recipients=[row["email"]])
-                    msg.body = f"Hello,\n\nYou requested a password reset for IntegrityCloud.\nClick the link below to set a new password. This link is valid for 30 minutes.\n\n{reset_link}\n\nIf you did not request this, please ignore this email."
+                    msg.body = f"Hello,\n\nYou requested a password reset for IntegrityCloud.\nClick the link below to set a new password.\n\n{reset_link}"
                     mail.send(msg)
-                    reset_link = None  # Hide link from the webpage since it was emailed
+                    reset_link = None 
                     flash("✅ A password reset link has been emailed to you!", "success")
                 except Exception as e:
                     print(f"Mail send failed: {e}")
                     flash("⚠️ Email failed to send. For now, use the link below.", "error")
             else:
-                flash("✅ Reset link generated below (Email not configured).", "success")
+                flash("✅ Reset link generated below.", "success")
         else:
             flash("❌ We couldn't find an account with that email address.", "error")
 
-        return render_template(
-            "forgot.html",
-            reset_link=reset_link
-        )
+        return render_template("forgot.html", reset_link=reset_link)
 
     return render_template("forgot.html")
-
 
 @app.route("/reset/<token>", methods=["GET", "POST"])
 def reset_password(token):
     try:
-        data = serializer.loads(token, max_age=1800)  # 30 min
+        data = serializer.loads(token, max_age=1800)
         user_id = int(data["user_id"])
     except SignatureExpired:
-        return "Reset link expired. Please request again.", 400
-    except (BadSignature, KeyError, ValueError):
+        return "Reset link expired.", 400
+    except Exception:
         return "Invalid reset link.", 400
 
     if request.method == "POST":
@@ -343,10 +324,7 @@ def reset_password(token):
 
         pw_hash = generate_password_hash(new_password)
         with db_cursor() as (conn, cur):
-            cur.execute("""
-                UPDATE users SET password_hash=%s
-                WHERE id=%s AND deleted_at IS NULL
-            """, (pw_hash, user_id))
+            cur.execute("UPDATE users SET password_hash=%s WHERE id=%s AND deleted_at IS NULL", (pw_hash, user_id))
 
         flash("✅ Password updated. Please login.", "success")
         return redirect(url_for("login"))
@@ -360,12 +338,97 @@ def reset_password(token):
 def home():
     return render_template("index.html")
 
-
 @app.route("/compare")
 @login_required
 def compare_page():
     return render_template("compare.html")
 
+
+# -------------------- CORE LOGIC (JSON API ROUTES) --------------------
+@app.route("/register_file", methods=["POST"])
+@login_required
+def register_file():
+    """Handles frontend AJAX requests to hash and register a new file."""
+    uploaded_file = request.files.get("file")
+    
+    if uploaded_file and uploaded_file.filename:
+        filename = secure_filename(uploaded_file.filename)
+        
+        # Read file into memory and calculate hash
+        file_bytes = uploaded_file.read() 
+        file_hash = sha256_bytes(file_bytes) 
+        filesize = len(file_bytes)
+        
+        try:
+            with db_cursor() as (conn, cur):
+                cur.execute("""
+                    INSERT INTO file_hashes (user_id, username, filename, filesize, sha256, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (current_user.id, current_user.username, filename, filesize, file_hash, utc_now()))
+                
+            return jsonify({
+                "status": "success", 
+                "message": f"File '{filename}' fingerprint securely registered."
+            }), 200
+        except Exception as e:
+            return jsonify({"status": "error", "message": "Database error occurred."}), 500
+            
+    return jsonify({"status": "error", "message": "No file was selected."}), 400
+
+
+@app.route("/verify_file", methods=["POST"])
+@login_required
+def verify_file():
+    """Handles frontend AJAX requests to verify if a file has been tampered with."""
+    uploaded_file = request.files.get("file")
+    
+    if uploaded_file and uploaded_file.filename:
+        filename = secure_filename(uploaded_file.filename)
+        
+        # Generate hash of the newly uploaded file to compare
+        file_bytes = uploaded_file.read() 
+        actual_hash = sha256_bytes(file_bytes) 
+        
+        try:
+            with db_cursor() as (conn, cur):
+                # Look up the original hash in the database
+                cur.execute("""
+                    SELECT sha256 FROM file_hashes 
+                    WHERE user_id=%s AND filename=%s 
+                    ORDER BY id DESC LIMIT 1
+                """, (current_user.id, filename))
+                row = cur.fetchone()
+                
+                if not row:
+                    return jsonify({
+                        "status": "error", 
+                        "message": f"No record found for '{filename}'. Please register it first."
+                    }), 404
+                    
+                expected_hash = row["sha256"]
+                
+                # Compare the hashes
+                if actual_hash == expected_hash:
+                    return jsonify({
+                        "status": "success", 
+                        "message": "File verified! It is perfectly intact."
+                    }), 200
+                else:
+                    # Log the tamper event if it fails
+                    cur.execute("""
+                        INSERT INTO tamper_logs (user_id, username, filename, expected_sha256, actual_sha256, created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (current_user.id, current_user.username, filename, expected_hash, actual_hash, utc_now()))
+                    
+                    return jsonify({
+                        "status": "error", 
+                        "message": "TAMPER DETECTED! This file has been modified."
+                    }), 400
+                    
+        except Exception as e:
+            return jsonify({"status": "error", "message": "Database error occurred during verification."}), 500
+
+    return jsonify({"status": "error", "message": "No file was selected."}), 400
 
 
 # -------------------- DASHBOARD --------------------
@@ -432,7 +495,6 @@ def admin_panel():
         cur.execute("SELECT COUNT(*) AS c FROM tamper_logs")
         total_tampers = cur.fetchone()["c"]
         
-        # Get Global Storage for the Admin Ring
         cur.execute("SELECT COALESCE(SUM(filesize), 0) AS c FROM file_hashes")
         global_storage_bytes = cur.fetchone()["c"]
 
@@ -453,18 +515,14 @@ def admin_panel():
         formatted_users = []
         for u in users_raw:
             user_dict = dict(u)
-            # Smart format showing Bytes, KB, or MB
             user_dict["formatted_storage"] = format_bytes(user_dict["total_storage"])
             
-            # --- SaaS Billing Calculation ---
-            # $5.00 Base + $0.15 per MB + $0.05 per File Hash
             storage_mb = user_dict["total_storage"] / (1024 * 1024)
             bill = 5.00 + (storage_mb * 0.15) + (user_dict["file_count"] * 0.05)
             user_dict["bill"] = f"${bill:.2f}"
             
             formatted_users.append(user_dict)
 
-    # Admin Global Platform Limit (e.g., 50 GB)
     GLOBAL_LIMIT_MB = 512
     raw_pct = (global_storage_bytes / (GLOBAL_LIMIT_MB * 1024 * 1024)) * 100
     global_storage_percentage = 1 if 0 < raw_pct < 1 else min(raw_pct, 100)
@@ -479,5 +537,6 @@ def admin_panel():
         global_storage_percentage=round(global_storage_percentage, 1),
         global_limit_mb=GLOBAL_LIMIT_MB
     )
+
 if __name__ == "__main__":
-    app.run(debug=True) 
+    app.run(debug=True)
