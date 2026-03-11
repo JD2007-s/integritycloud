@@ -348,7 +348,7 @@ def compare_page():
 
 
 # -------------------- CORE LOGIC (JSON API ROUTES) --------------------
-/register_file@app.route("/register_file", methods=["POST"])
+@app.route("/register_file", methods=["POST"])
 @login_required
 def register_file():
     uploaded_file = request.files.get("file")
