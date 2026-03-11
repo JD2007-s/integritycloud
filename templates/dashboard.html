@@ -1,108 +1,111 @@
-{% extends "base.html" %}
-{% block title %}Dashboard - IntegrityCloud{% endblock %}
+  {% extends "base.html" %}
+  {% block title %}Dashboard - IntegrityCloud{% endblock %}
 
-{% block content %}
-<div class="space-y-8 max-w-7xl mx-auto py-6">
+  {% block content %}
+  <div class="space-y-8 max-w-7xl mx-auto py-6">
 
-  <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 border-b border-zinc-800 pb-6">
-    <div>
-      <h2 class="text-3xl font-extrabold text-white tracking-tight">Dashboard</h2>
-      <p class="text-zinc-400 text-sm mt-1">Monitor your file integrity and recent activity logs.</p>
-    </div>
-    <div class="flex gap-3">
-      <a href="/compare" class="flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-300 font-medium hover:bg-zinc-700 hover:text-white transition-all duration-200">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-        Compare Files
-      </a>
-      <a href="/home" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 transition-all duration-200">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-        Register New File
-      </a>
-    </div>
-  </div>
-
-  <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-sm mb-6">
-    <div class="flex items-baseline gap-2 mb-4">
-      <h2 class="text-4xl font-normal text-white tracking-tight">{{ storage_formatted }}</h2>
-      <span class="text-lg text-zinc-400 font-medium">of {{ storage_limit_mb }} MB used</span>
-    </div>
-    
-    <div class="w-full bg-zinc-800 rounded-full h-3 overflow-hidden flex">
-      <div class="bg-blue-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: {{ storage_percentage | default(0) }}%;"></div>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-zinc-600 transition-colors">
-      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-        <svg class="w-16 h-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>
+    <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 border-b border-zinc-800 pb-6">
+      <div>
+        <h2 class="text-3xl font-extrabold text-white tracking-tight">Dashboard</h2>
+        <p class="text-zinc-400 text-sm mt-1">Monitor your file integrity and recent activity logs.</p>
       </div>
-      <p class="text-zinc-400 text-sm font-medium">Active Account</p>
-      <p class="text-xl font-bold text-white mt-2">{{ current_user.username }}</p>
-      <p class="text-zinc-500 text-sm mt-1">{{ current_user.email }}</p>
-    </div>
-
-    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-emerald-500/50 transition-colors">
-      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-        <svg class="w-16 h-16 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path></svg>
+      <div class="flex gap-3">
+        <a href="/compare" class="flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-300 font-medium hover:bg-zinc-700 hover:text-white transition-all duration-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+          Compare Files
+        </a>
+        <a href="/home" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 transition-all duration-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          Register New File
+        </a>
       </div>
-      <p class="text-zinc-400 text-sm font-medium">Secured Hashes</p>
-      <p class="text-4xl font-extrabold text-emerald-400 mt-2">{{ hashes_count }}</p>
-      <p class="text-zinc-500 text-sm mt-1">Total protected files</p>
     </div>
 
-    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-rose-500/50 transition-colors">
-      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-        <svg class="w-16 h-16 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-sm mb-6">
+      <div class="flex items-baseline gap-2 mb-4">
+        <h2 class="text-4xl font-normal text-white tracking-tight">{{ storage_formatted }}</h2>
+        <span class="text-lg text-zinc-400 font-medium">of {{ storage_limit_mb }} MB used</span>
       </div>
-      <p class="text-zinc-400 text-sm font-medium">Tamper Alerts</p>
-      <p class="text-4xl font-extrabold {% if tamper_count > 0 %}text-rose-500{% else %}text-white{% endif %} mt-2">{{ tamper_count }}</p>
-      <p class="text-zinc-500 text-sm mt-1">Integrity mismatch events</p>
-    </div>
-  </div>
-
-  <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg mt-8">
-    <div class="px-6 py-5 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
-      <h3 class="text-lg font-bold text-white flex items-center gap-2">
-        <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        Recent Registered Hashes
-      </h3>
-      <span class="px-3 py-1 bg-zinc-800 text-zinc-300 text-xs font-semibold rounded-full">Last 20</span>
+      
+      <div class="w-full bg-zinc-800 rounded-full h-3 overflow-hidden flex">
+        <div class="bg-blue-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: {{ storage_percentage | default(0) }}%;"></div>
+      </div>
     </div>
 
-    <div class="overflow-x-auto">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-zinc-600 transition-colors">
+        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+          <svg class="w-16 h-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>
+        </div>
+        <p class="text-zinc-400 text-sm font-medium">Active Account</p>
+        <p class="text-xl font-bold text-white mt-2">{{ current_user.username }}</p>
+        <p class="text-zinc-500 text-sm mt-1">{{ current_user.email }}</p>
+      </div>
+
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-emerald-500/50 transition-colors">
+        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+          <svg class="w-16 h-16 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path></svg>
+        </div>
+        <p class="text-zinc-400 text-sm font-medium">Secured Hashes</p>
+        <p class="text-4xl font-extrabold text-emerald-400 mt-2">{{ hashes_count }}</p>
+        <p class="text-zinc-500 text-sm mt-1">Total protected files</p>
+      </div>
+
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm relative overflow-hidden group hover:border-rose-500/50 transition-colors">
+        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+          <svg class="w-16 h-16 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+        </div>
+        <p class="text-zinc-400 text-sm font-medium">Tamper Alerts</p>
+        <p class="text-4xl font-extrabold {% if tamper_count > 0 %}text-rose-500{% else %}text-white{% endif %} mt-2">{{ tamper_count }}</p>
+        <p class="text-zinc-500 text-sm mt-1">Integrity mismatch events</p>
+      </div>
+    </div>
+
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg mt-8">
+      <div class="px-6 py-5 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Recent Registered Hashes
+        </h3>
+        <span class="px-3 py-1 bg-zinc-800 text-zinc-300 text-xs font-semibold rounded-full">Last 20</span>
+      </div>
+
+      <div class="overflow-x-auto">
       <table class="min-w-full text-sm text-left whitespace-nowrap">
-        <thead class="text-zinc-400 bg-zinc-800/30 uppercase text-xs font-semibold tracking-wider">
-          <tr>
-            <th class="px-6 py-4">Filename</th>
-            <th class="px-6 py-4">Size</th>
-            <th class="px-6 py-4">SHA-256 Checksum</th>
-            <th class="px-6 py-4 text-right">Timestamp (UTC)</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-zinc-800/50">
-          {% if hashes and hashes|length > 0 %}
-            {% for h in hashes %}
-              <tr class="hover:bg-zinc-800/30 transition-colors">
-                <td class="px-6 py-4 font-medium text-zinc-200">{{ h.filename }}</td>
-                <td class="px-6 py-4 text-zinc-400">{{ h.filesize }} bytes</td>
-                <td class="px-6 py-4">
-                  <span class="px-2 py-1 bg-zinc-800 text-emerald-400 font-mono text-xs rounded-md">{{ h.sha256[:16] }}...{{ h.sha256[-16:] }}</span>
-                </td>
-                <td class="px-6 py-4 text-zinc-500 text-right">{{ h.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-              </tr>
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="4" class="px-6 py-12 text-center">
-                <p class="text-zinc-400 font-medium text-lg">No file hashes stored yet.</p>
-              </td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
+  <thead class="text-zinc-400 bg-zinc-800/30 uppercase text-xs font-semibold tracking-wider">
+    <tr>
+      <th class="px-6 py-4">Filename</th>
+      <th class="px-6 py-4">Size</th>
+      <th class="px-6 py-4">SHA-256 Checksum</th>
+      <th class="px-6 py-4 text-center">Timestamp (UTC)</th>
+      <th class="px-6 py-4 text-right">Action</th> </tr>
+  </thead>
+  <tbody class="divide-y divide-zinc-800/50">
+    {% if hashes and hashes|length > 0 %}
+      {% for h in hashes %}
+        <tr class="hover:bg-zinc-800/30 transition-colors">
+          <td class="px-6 py-4 font-medium text-zinc-200">{{ h.filename }}</td>
+          <td class="px-6 py-4 text-zinc-400">{{ h.filesize }} bytes</td>
+          <td class="px-6 py-4">
+            <span class="px-2 py-1 bg-zinc-800 text-emerald-400 font-mono text-xs rounded-md">{{ h.sha256[:16] }}...{{ h.sha256[-16:] }}</span>
+          </td>
+          <td class="px-6 py-4 text-zinc-500 text-center">{{ h.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td class="px-6 py-4 text-right">
+            <form action="{{ url_for('delete_file', file_id=h.id) }}" method="POST" class="inline" onsubmit="return confirm('Wait! This will permanently delete the file from Supabase Cloud and your history. Proceed?')">
+              <button type="submit" class="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-all duration-200">
+                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    {% else %}
+      {% endif %}
+  </tbody>
+</table>
+      </div>
     </div>
-  </div>
 
-</div>
-{% endblock %}
+  </div>
+  {% endblock %}

@@ -455,6 +455,8 @@ def verify_file():
     return jsonify({"status": "error", "message": "No file was selected."}), 400
 
 
+# ... (Keep your imports and config at the top the same) ...
+
 # -------------------- DASHBOARD --------------------
 @app.route("/dashboard")
 @login_required
@@ -474,7 +476,7 @@ def dashboard():
         storage_bytes = cur.fetchone()["total_storage"]
 
         cur.execute("""
-            SELECT filename, filesize, sha256, created_at
+            SELECT id, filename, filesize, sha256, created_at
             FROM file_hashes
             WHERE user_id=%s
             ORDER BY id DESC LIMIT 20
@@ -503,6 +505,41 @@ def dashboard():
         storage_limit_mb=STORAGE_LIMIT_MB,
         storage_percentage=round(storage_percentage, 1)
     )
+
+# -------------------- DELETE FEATURE --------------------
+@app.route("/delete_file/<int:file_id>", methods=["POST"])
+@login_required
+def delete_file(file_id):
+    with db_cursor() as (conn, cur):
+        # 1. Verify owner and get filename
+        cur.execute("SELECT filename FROM file_hashes WHERE id=%s AND user_id=%s", (file_id, current_user.id))
+        row = cur.fetchone()
+        
+        if row:
+            filename = row['filename']
+            
+            # 2. Delete from Supabase Cloud
+            endpoint = f"{SUPABASE_URL}/storage/v1/object/integrity-files/{filename}"
+            headers = {
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}"
+            }
+            try:
+                cloud_res = requests.delete(endpoint, headers=headers)
+                if cloud_res.status_code not in [200, 204]:
+                    print(f"Supabase Delete Warning: {cloud_res.text}")
+            except Exception as e:
+                print(f"Cloud Delete Error: {e}")
+
+            # 3. Delete from Database
+            cur.execute("DELETE FROM file_hashes WHERE id=%s", (file_id,))
+            flash(f"✅ {filename} has been removed from cloud storage.", "success")
+        else:
+            flash("❌ File not found or unauthorized.", "error")
+            
+    return redirect(url_for('dashboard'))
+
+# ... (Keep the rest of your admin routes below) ...
 
 # -------------------- ADMIN --------------------
 @app.route("/admin")
