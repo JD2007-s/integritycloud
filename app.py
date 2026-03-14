@@ -28,6 +28,39 @@ try:
 except ImportError:
     MAIL_AVAILABLE = False
 
+# -------------------- AI SUMMARY FEATURE --------------------
+def get_ai_summary(file_text):
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    
+    # Securely fetches the key from Render or your local .env file
+    nvidia_key = os.environ.get("NVIDIA_AI_KEY")
+    
+    if not nvidia_key:
+        return "AI key not configured."
+
+    headers = {
+        "Authorization": f"Bearer {nvidia_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "meta/llama-3.2-3b-instruct",
+        "messages": [
+            {"role": "system", "content": "You are a helpful cloud security assistant. Summarize the following text in exactly 2 short sentences."},
+            {"role": "user", "content": file_text[:2000]} # Read up to 2000 characters to keep it fast
+        ],
+        "max_tokens": 100
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return data['choices'][0]['message']['content']
+        else:
+            return "AI Summary Error."
+    except Exception as e:
+        return "AI Summary not available."
 
 # -------------------- APP SETUP --------------------
 app = Flask(__name__)
@@ -36,11 +69,12 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")  # MUST set SECRET_K
 login_manager = LoginManager()
 login_manager.login_view = "login"
 login_manager.init_app(app)
+
 # --- SUPABASE CONFIGURATION ---
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-
+serializer = URLSafeTimedSerializer(app.secret_key)
 
 # --- Email Configuration (Gmail SMTP) ---
 mail = Mail()
@@ -52,7 +86,6 @@ if MAIL_AVAILABLE:
     app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD", "jqlcsqbtjunpvvjz")
     app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", "solankiparul2026@gmail.com")
     mail.init_app(app)
-
 
 # -------------------- HELPERS --------------------
 def utc_now():
@@ -365,7 +398,6 @@ def register_file():
         filesize = len(file_bytes)
         
         # 2. AUTOMATIC SUPABASE UPLOAD
-        # This part runs every single time you click the button
         endpoint = f"{SUPABASE_URL}/storage/v1/object/integrity-files/{filename}"
         headers = {
             "apikey": SUPABASE_KEY,
@@ -374,26 +406,32 @@ def register_file():
             "x-upsert": "true" # Overwrites if file exists
         }
         
-        # We send the bytes directly to Supabase
         cloud_response = requests.post(endpoint, headers=headers, data=file_bytes)
         
         if cloud_response.status_code not in [200, 201]:
             print(f"Cloud Storage Error: {cloud_response.text}")
             return jsonify({"status": "error", "message": "Cloud storage failed. Try again."}), 500
 
-        # 3. Save to Database (Only if cloud upload worked)
+        # 3. Save to Database
         with db_cursor() as (conn, cur):
             cur.execute("""
                 INSERT INTO file_hashes (user_id, username, filename, filesize, sha256, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (current_user.id, current_user.username, filename, filesize, file_hash, utc_now()))
             
+        # 4. NEW AI FEATURE: Generate summary if it's a text file
+        ai_summary = "Not a text file."
+        if filename.endswith('.txt'):
+            file_text = file_bytes.decode('utf-8', errors='ignore')
+            ai_summary = get_ai_summary(file_text)
+
         return jsonify({
             "status": "success", 
             "message": "File secured in Supabase and Database!",
             "filename": filename,
             "filesize": filesize,
-            "hash": file_hash
+            "hash": file_hash,
+            "ai_summary": ai_summary
         }), 200
         
     except Exception as e:
@@ -403,19 +441,15 @@ def register_file():
 @app.route("/verify_file", methods=["POST"])
 @login_required
 def verify_file():
-    """Handles frontend AJAX requests to verify if a file has been tampered with."""
     uploaded_file = request.files.get("file")
     
     if uploaded_file and uploaded_file.filename:
         filename = secure_filename(uploaded_file.filename)
-        
-        # Generate hash of the newly uploaded file to compare
         file_bytes = uploaded_file.read() 
         actual_hash = sha256_bytes(file_bytes) 
         
         try:
             with db_cursor() as (conn, cur):
-                # Look up the original hash in the database
                 cur.execute("""
                     SELECT sha256 FROM file_hashes 
                     WHERE user_id=%s AND filename=%s 
@@ -431,14 +465,12 @@ def verify_file():
                     
                 expected_hash = row["sha256"]
                 
-                # Compare the hashes
                 if actual_hash == expected_hash:
                     return jsonify({
                         "status": "success", 
                         "message": "File verified! It is perfectly intact."
                     }), 200
                 else:
-                    # Log the tamper event if it fails
                     cur.execute("""
                         INSERT INTO tamper_logs (user_id, username, filename, expected_sha256, actual_sha256, created_at)
                         VALUES (%s, %s, %s, %s, %s, %s)
@@ -454,8 +486,6 @@ def verify_file():
 
     return jsonify({"status": "error", "message": "No file was selected."}), 400
 
-
-# ... (Keep your imports and config at the top the same) ...
 
 # -------------------- DASHBOARD --------------------
 @app.route("/dashboard")
@@ -511,14 +541,12 @@ def dashboard():
 @login_required
 def delete_file(file_id):
     with db_cursor() as (conn, cur):
-        # 1. Verify owner and get filename
         cur.execute("SELECT filename FROM file_hashes WHERE id=%s AND user_id=%s", (file_id, current_user.id))
         row = cur.fetchone()
         
         if row:
             filename = row['filename']
             
-            # 2. Delete from Supabase Cloud
             endpoint = f"{SUPABASE_URL}/storage/v1/object/integrity-files/{filename}"
             headers = {
                 "apikey": SUPABASE_KEY,
@@ -531,15 +559,12 @@ def delete_file(file_id):
             except Exception as e:
                 print(f"Cloud Delete Error: {e}")
 
-            # 3. Delete from Database
             cur.execute("DELETE FROM file_hashes WHERE id=%s", (file_id,))
             flash(f"✅ {filename} has been removed from cloud storage.", "success")
         else:
             flash("❌ File not found or unauthorized.", "error")
             
     return redirect(url_for('dashboard'))
-
-# ... (Keep the rest of your admin routes below) ...
 
 # -------------------- ADMIN --------------------
 @app.route("/admin")
@@ -600,4 +625,5 @@ def admin_panel():
     )
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)

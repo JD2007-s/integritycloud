@@ -136,8 +136,6 @@
           <tr>
             <th class="px-6 py-4">Username / Email</th>
             <th class="px-6 py-4">Role</th>
-            <th class="px-6 py-4">Files</th>
-            <th class="px-6 py-4">Storage Used</th>
             <th class="px-6 py-4 text-emerald-400">Est. Bill</th>
             <th class="px-6 py-4 text-right">Actions</th>
           </tr>
@@ -158,12 +156,6 @@
               {% endif %}
             </td>
 
-            <td class="px-6 py-4 font-mono text-zinc-300">{{ u.file_count }}</td>
-            
-            <td class="px-6 py-4 font-mono text-blue-400">
-              {{ u.formatted_storage }}
-            </td>
-            
             <td class="px-6 py-4 font-mono font-bold text-emerald-400 bg-emerald-500/5 border-l border-emerald-500/10">
               {{ u.bill }}
             </td>

@@ -1,58 +1,73 @@
 /* Minimal custom styles for IntegrityCloud */
-body { -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
-.container { max-width: 1100px; }
-input[type=file] { color: #fff; }
+
+/* --- 1. Reset & Global --- */
 html, body {
-	margin: 0;
-	padding: 0;
-	width: 100%;
-	height: 100%;
-	background:#000;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
 }
 
-.fixed-bg {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: -10;
-  pointer-events: none;
-  overflow: hidden;
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    position: relative;
+    z-index: 1; /* Creates a stacking context for page content */
 }
 
-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
+/* Ensure structure stays above the background */
+header, main, footer {
+    position: relative;
+    z-index: 1;
+}
+
+.container { 
+    max-width: 1100px; 
+    margin: 0 auto; /* Added: centers the container horizontally */
+}
+
+/* --- 2. Base Elements --- */
+input[type=file] { 
+    color: #fff; 
 }
 
 .text-img {
-	display:none;
+    display: none;
+}
+
+/* --- 3. Background Canvas Setup --- */
+.fixed-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -10;
+    pointer-events: none; /* Lets clicks pass through to content */
+    overflow: hidden;
 }
 
 canvas {
-	position: absolute;
-	top:50%;
-	left:50%;
-	transform:translate(-50%, -50%);  
-	aspect-ratio: 1;
-	width: 100%;
-	height: auto;
+    display: block;
+    pointer-events: none;
+    
+    /* Centering */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);  
+    
+    /* Scaling */
+    aspect-ratio: 1;
+    width: 100%;
+    height: auto;
 }
 
+/* Portrait mode adjustments */
 @media (max-aspect-ratio: 1) {
-	canvas {
-		width: auto;
-		height: 100%;
-	}
-}
-/* make background canvas not block clicks */
-.fixed-bg, canvas { pointer-events: none; }
-
-
-/* keep page content above background */
-body, header, main, footer {
-  position: relative;
-  z-index: 1;
+    canvas {
+        width: auto;
+        height: 100%;
+    }
 }

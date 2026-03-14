@@ -53,6 +53,15 @@
       </form>
 
       <div id="registerOut" class="mt-6 hidden"></div>
+
+      <div id="ai-summary-box" class="mt-4 hidden p-4 rounded-xl text-sm bg-teal-500/10 border border-teal-500/30 shadow-inner">
+        <div class="flex items-center gap-2 font-bold mb-2 text-teal-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          AI Document Summary
+        </div>
+        <p id="ai-summary-text" class="text-zinc-300 font-mono text-xs leading-relaxed"></p>
+      </div>
+
     </div>
 
     <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-xl relative overflow-hidden group">
@@ -95,7 +104,7 @@
     fd.append("file", inp.files[0]);
     const res = await fetch(url, { method: "POST", body: fd });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
+    if (!res.ok) throw new Error(data.message || data.error || "Request failed");
     return data;
   }
 
@@ -103,12 +112,19 @@
   document.getElementById("registerForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const out = document.getElementById("registerOut");
+    const aiBox = document.getElementById("ai-summary-box");
+    
+    // Reset displays
     out.className = "mt-6 p-4 rounded-xl text-sm font-medium bg-zinc-800 border border-zinc-700 text-zinc-300";
     out.classList.remove("hidden");
-    out.innerHTML = `<span class="animate-pulse flex items-center gap-2"><svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing Hash...</span>`;
+    aiBox.classList.add("hidden"); // Hide AI box while loading
+    
+    out.innerHTML = `<span class="animate-pulse flex items-center gap-2"><svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing Hash & AI Summary...</span>`;
     
     try {
       const data = await postFile("/register_file", "registerFile");
+      
+      // Update standard success output
       out.className = "mt-6 p-4 rounded-xl text-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-inner";
       out.innerHTML = `
         <div class="flex items-center gap-2 font-bold mb-2">
@@ -121,6 +137,13 @@
           <p class="break-all"><span class="text-zinc-500">Hash:</span> <span class="text-emerald-300">${data.hash}</span></p>
         </div>
       `;
+
+      // --- AI LOGIC TRIGGER ---
+      if (data.ai_summary && data.ai_summary !== "Not a text file.") {
+          document.getElementById('ai-summary-text').innerText = data.ai_summary;
+          aiBox.classList.remove('hidden'); // Reveal the box!
+      }
+
     } catch (err) {
       out.className = "mt-6 p-4 rounded-xl text-sm bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-inner";
       out.innerHTML = `❌ ${err.message}`;
@@ -138,7 +161,7 @@
     try {
       const data = await postFile("/verify_file", "verifyFile");
 
-      if (data.status === "SAFE") {
+      if (data.status === "SAFE" || data.status === "success") {
         out.className = "mt-6 p-4 rounded-xl text-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-inner";
         out.innerHTML = `
           <div class="flex items-center gap-2 font-bold mb-2">
@@ -147,11 +170,10 @@
           </div>
           <p class="text-xs text-zinc-400 mb-2">${data.message}</p>
           <div class="space-y-1 font-mono text-xs text-zinc-300 bg-black/40 p-3 rounded-lg border border-zinc-800">
-            <p><span class="text-zinc-500">File:</span> ${data.filename}</p>
-            <p class="break-all"><span class="text-zinc-500">Matched Hash:</span> <span class="text-emerald-300">${data.actual_hash}</span></p>
+            <p><span class="text-zinc-500">File:</span> ${data.filename || document.getElementById("verifyFile").files[0].name}</p>
           </div>
         `;
-      } else if (data.status === "TAMPERED") {
+      } else if (data.status === "error" && data.message.includes("TAMPER")) {
         out.className = "mt-6 p-4 rounded-xl text-sm bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-inner";
         out.innerHTML = `
           <div class="flex items-center gap-2 font-bold text-rose-500 mb-2">
@@ -159,24 +181,13 @@
             TAMPERED: Modification Detected
           </div>
           <p class="text-xs text-rose-400/80 mb-2">${data.message}</p>
-          <div class="space-y-2 font-mono text-xs text-zinc-300 bg-black/40 p-3 rounded-lg border border-rose-900/50">
-            <p><span class="text-zinc-500">File:</span> ${data.filename}</p>
-            <div>
-              <span class="text-zinc-500 block mb-1">Expected (Original):</span>
-              <p class="break-all text-emerald-400/70 line-through">${data.expected_hash}</p>
-            </div>
-            <div>
-              <span class="text-zinc-500 block mb-1">Actual (Modified):</span>
-              <p class="break-all text-rose-400 font-bold">${data.actual_hash}</p>
-            </div>
-          </div>
         `;
       } else {
         out.className = "mt-6 p-4 rounded-xl text-sm bg-amber-500/10 border border-amber-500/30 text-amber-400 shadow-inner";
         out.innerHTML = `
           <div class="flex items-center gap-2 font-bold mb-1">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            Not Registered
+            Not Registered / Error
           </div>
           <p class="text-xs text-amber-400/80">${data.message}</p>
         `;
