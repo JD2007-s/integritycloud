@@ -328,7 +328,7 @@ def forgot():
 
             # --- NEW GOOGLE SCRIPT EMAIL API ---
             # Paste your copied Web App URL inside these quotes:
-            script_url = "PASTE_YOUR_COPIED_LINK_HERE" 
+            script_url = "https://script.google.com/macros/s/AKfycbzbOuAJQwMzUeoFIycJ9lvIIRVjxnQWu2Qm9dBJPXZ_Mx_proHfreuYv_QurJs0uGZ_ug/exec" 
             
             payload = {
                 "to": row["email"],
