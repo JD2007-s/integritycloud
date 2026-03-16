@@ -318,56 +318,37 @@ def forgot():
             cur.execute("SELECT id, email FROM users WHERE deleted_at IS NULL AND lower(email)=%s LIMIT 1", (email,))
             row = cur.fetchone()
 
-        reset_link = None
         if row:
             token = serializer.dumps({"user_id": row["id"]})
+            # Make sure this points to your live Render URL so the link works!
             base = (os.environ.get("APP_BASE_URL") or request.host_url).rstrip("/")
             reset_link = f"{base}{url_for('reset_password', token=token)}"
 
-            if MAIL_AVAILABLE and app.config.get("MAIL_USERNAME") and app.config.get("MAIL_PASSWORD"):
-                try:
-                    msg = Message("Password Reset - IntegrityCloud", recipients=[row["email"]])
-                    msg.body = f"Hello,\n\nYou requested a password reset for IntegrityCloud.\nClick the link below to set a new password.\n\n{reset_link}"
-                    mail.send(msg)
-                    reset_link = None 
-                    flash("✅ A password reset link has been emailed to you!", "success")
-                except Exception as e:
-                    print(f"Mail send failed: {e}")
-                    flash("⚠️ Email failed to send. For now, use the link below.", "error")
-            else:
-                flash("✅ Reset link generated below.", "success")
+            # --- NEW GOOGLE SCRIPT EMAIL API ---
+            # Paste your copied Web App URL inside these quotes:
+            script_url = "PASTE_YOUR_COPIED_LINK_HERE"
+            
+            payload = {
+                "to": row["email"],
+                "subject": "Password Reset - IntegrityCloud",
+                "body": f"Hello,\n\nYou requested a password reset for IntegrityCloud.\nClick the link below to set a new password.\n\n{reset_link}"
+            }
+            
+            try:
+                # This sends a secure web request to Google, bypassing Render's firewall!
+                requests.post(script_url, data=payload, timeout=15)
+                flash("✅ A password reset link has been emailed to you!", "success")
+            except Exception as e:
+                print(f"API send failed: {e}")
+                flash("⚠️ Email API failed to connect.", "error")
+            # -----------------------------------
+
         else:
             flash("❌ We couldn't find an account with that email address.", "error")
 
-        return render_template("forgot.html", reset_link=reset_link)
+        return render_template("forgot.html")
 
     return render_template("forgot.html")
-
-@app.route("/reset/<token>", methods=["GET", "POST"])
-def reset_password(token):
-    try:
-        data = serializer.loads(token, max_age=1800)
-        user_id = int(data["user_id"])
-    except SignatureExpired:
-        return "Reset link expired.", 400
-    except Exception:
-        return "Invalid reset link.", 400
-
-    if request.method == "POST":
-        new_password = request.form.get("password") or ""
-        if len(new_password) < 6:
-            return render_template("reset.html", error="Password must be at least 6 characters")
-
-        pw_hash = generate_password_hash(new_password)
-        with db_cursor() as (conn, cur):
-            cur.execute("UPDATE users SET password_hash=%s WHERE id=%s AND deleted_at IS NULL", (pw_hash, user_id))
-
-        flash("✅ Password updated. Please login.", "success")
-        return redirect(url_for("login"))
-
-    return render_template("reset.html")
-
-
 # -------------------- PAGES --------------------
 @app.route("/home")
 @login_required
