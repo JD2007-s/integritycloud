@@ -322,11 +322,13 @@ def forgot():
             token = serializer.dumps({"user_id": row["id"]})
             # Make sure this points to your live Render URL so the link works!
             base = (os.environ.get("APP_BASE_URL") or request.host_url).rstrip("/")
+            
+            # This line caused the 500 error because the function below was missing!
             reset_link = f"{base}{url_for('reset_password', token=token)}"
 
             # --- NEW GOOGLE SCRIPT EMAIL API ---
             # Paste your copied Web App URL inside these quotes:
-            script_url = "PASTE_YOUR_COPIED_LINK_HERE"
+            script_url = "PASTE_YOUR_COPIED_LINK_HERE" 
             
             payload = {
                 "to": row["email"],
@@ -349,6 +351,32 @@ def forgot():
         return render_template("forgot.html")
 
     return render_template("forgot.html")
+
+
+# ---> THIS IS THE MISSING FUNCTION YOU NEED TO ADD <---
+@app.route("/reset/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    try:
+        # Check if the token is valid and hasn't expired
+        data = serializer.loads(token, max_age=3600)
+        user_id = data.get("user_id")
+    except Exception:
+        flash("❌ The reset link is invalid or has expired.", "error")
+        return redirect(url_for("forgot"))
+
+    if request.method == "POST":
+        new_password = request.form.get("password")
+        
+        # Hash the new password and update the database
+        hashed_pw = generate_password_hash(new_password)
+        with db_cursor() as (conn, cur):
+            cur.execute("UPDATE users SET password_hash=%s WHERE id=%s", (hashed_pw, user_id))
+            conn.commit()
+            
+        flash("✅ Password successfully updated! You can now log in.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("reset.html", token=token)
 # -------------------- PAGES --------------------
 @app.route("/home")
 @login_required
