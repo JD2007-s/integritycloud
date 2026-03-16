@@ -24,7 +24,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 # Optional email (only if env vars configured)
 try:
     from flask_mail import Mail, Message
-    MAIL_AVAILABLE = True
+    MAIL_AVAILABLE = False
 except ImportError:
     MAIL_AVAILABLE = False
 
@@ -623,6 +623,32 @@ def admin_panel():
         global_storage_percentage=round(global_storage_percentage, 1),
         global_limit_mb=GLOBAL_LIMIT_MB
     )
+# -------------------- LEGAL PAGES --------------------
+@app.route("/privacy")
+def privacy():
+    return """
+    <body style="background-color: #09090b; color: #e4e4e7; font-family: sans-serif; display: flex; justify-content: center; padding-top: 100px;">
+        <div style="max-width: 600px; padding: 30px; background: #18181b; border: 1px solid #27272a; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+            <h2 style="color: #10b981; margin-top: 0;">Privacy Policy</h2>
+            <p style="line-height: 1.6; color: #a1a1aa;">This application is an academic project developed for university demonstration purposes. We respect your privacy. No real-world user data is tracked, sold, or distributed to third parties.</p>
+            <br>
+            <a href="/" style="color: #3b82f6; text-decoration: none; font-weight: bold;">&larr; Back to IntegrityCloud</a>
+        </div>
+    </body>
+    """
+
+@app.route("/terms")
+def terms():
+    return """
+    <body style="background-color: #09090b; color: #e4e4e7; font-family: sans-serif; display: flex; justify-content: center; padding-top: 100px;">
+        <div style="max-width: 600px; padding: 30px; background: #18181b; border: 1px solid #27272a; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+            <h2 style="color: #3b82f6; margin-top: 0;">Terms of Service</h2>
+            <p style="line-height: 1.6; color: #a1a1aa;">By using IntegrityCloud, you acknowledge that this is a student-developed security project. While we use advanced cryptography to secure files, please do not upload highly sensitive, real-world personal data to this demonstration environment.</p>
+            <br>
+            <a href="/" style="color: #3b82f6; text-decoration: none; font-weight: bold;">&larr; Back to IntegrityCloud</a>
+        </div>
+    </body>
+    """
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
