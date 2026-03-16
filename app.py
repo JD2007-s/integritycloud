@@ -659,6 +659,14 @@ def terms():
     </body>
     """
 
+# -------------------- BILLING MOCKUP --------------------
+@app.route("/billing")
+def billing():
+    # If the user isn't logged in, redirect them to login
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    return render_template("billing.html")
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

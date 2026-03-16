@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Billing & Usage - IntegrityCloud{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-10">
+    <div class="mb-8">
+        <h2 class="text-3xl font-extrabold text-white tracking-tight">Billing & Usage</h2>
+        <p class="text-zinc-400 text-sm mt-1">Manage your cloud storage plan and academic tier limits.</p>
+    </div>
+
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-xl relative overflow-hidden group">
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
+        
+        <div class="flex justify-between items-center border-b border-zinc-800 pb-6 mb-6">
+            <div class="flex items-center gap-4">
+                <div class="p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                </div>
+                <div>
+                    <h3 class="text-2xl font-bold text-white">Academic Free Tier</h3>
+                    <p class="text-zinc-400 text-sm">Perfect for university cloud demonstrations.</p>
+                </div>
+            </div>
+            <span class="px-4 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]">Status: ACTIVE</span>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-black/50 p-4 rounded-xl border border-zinc-800/50">
+                <p class="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-1">Current Balance</p>
+                <p class="text-2xl font-mono text-white">$0.00 <span class="text-sm text-zinc-500 font-sans">/ mo</span></p>
+            </div>
+            <div class="bg-black/50 p-4 rounded-xl border border-zinc-800/50">
+                <p class="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-1">Storage Limit</p>
+                <p class="text-2xl font-mono text-white">512 MB <span class="text-sm text-zinc-500 font-sans">Max</span></p>
+            </div>
+            <div class="bg-black/50 p-4 rounded-xl border border-zinc-800/50">
+                <p class="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-1">API Calls</p>
+                <p class="text-2xl font-mono text-emerald-400">Unlimited</p>
+            </div>
+        </div>
+
+        <div class="flex gap-4">
+            <button disabled class="px-6 py-2 bg-zinc-800 text-zinc-500 font-semibold rounded-lg cursor-not-allowed border border-zinc-700">Upgrade Plan (Disabled)</button>
+            <a href="/dashboard" class="px-6 py-2 bg-transparent text-zinc-300 font-semibold rounded-lg hover:text-white transition-colors">Return to Dashboard</a>
+        </div>
+        
+        <div class="mt-8 pt-6 border-t border-zinc-800/50">
+            <p class="text-zinc-600 text-xs text-center flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Note: This is a simulated billing page designed for the Cloud Computing syllabus demonstration.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
