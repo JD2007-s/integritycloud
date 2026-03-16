@@ -8,7 +8,6 @@ import sys
 from datetime import datetime, timezone
 from functools import wraps
 from contextlib import contextmanager
-import requests
 import psycopg
 from psycopg.rows import dict_row
 
