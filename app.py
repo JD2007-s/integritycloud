@@ -660,19 +660,11 @@ def terms():
     """
 
 # -------------------- BILLING MOCKUP --------------------
+# -------------------- BILLING MOCKUP --------------------
 @app.route("/billing")
 def billing():
-    # 1. Check if logged in
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-        
-    # 2. Fetch the current user's details for the navigation bar!
-    with db_cursor() as (conn, cur):
-        cur.execute("SELECT * FROM users WHERE id=%s", (session['user_id'],))
-        current_user = cur.fetchone()
-
-    # 3. Pass the user to the template
-    return render_template("billing.html", current_user=current_user)
+    # We will let your base.html handle the current_user automatically!
+    return render_template("billing.html")
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
