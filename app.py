@@ -1,5 +1,5 @@
 from flask import (
-    Flask, render_template, request, redirect, url_for,
+    Flask, render_template, request, redirect, session, url_for,
     jsonify, abort, flash
 )
 import hashlib
@@ -662,11 +662,17 @@ def terms():
 # -------------------- BILLING MOCKUP --------------------
 @app.route("/billing")
 def billing():
-    # If the user isn't logged in, redirect them to login
+    # 1. Check if logged in
     if 'user_id' not in session:
         return redirect(url_for('login'))
         
-    return render_template("billing.html")
+    # 2. Fetch the current user's details for the navigation bar!
+    with db_cursor() as (conn, cur):
+        cur.execute("SELECT * FROM users WHERE id=%s", (session['user_id'],))
+        current_user = cur.fetchone()
+
+    # 3. Pass the user to the template
+    return render_template("billing.html", current_user=current_user)
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
